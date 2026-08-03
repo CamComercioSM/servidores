@@ -1,0 +1,8 @@
+# Plantilla de inventario. No incluir datos reales en este archivo.
+all:
+  hosts:
+    servidor-ejemplo:
+      ansible_host: 192.0.2.10
+      ansible_user: usuario_operativo
+  vars:
+    environment: example
