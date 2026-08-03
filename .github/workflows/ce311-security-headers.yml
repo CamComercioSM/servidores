@@ -1,0 +1,67 @@
+name: CE-311 - Verificar cabeceras HTTP
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ce311-security-headers.yml'
+      - 'scripts/security/verificar-cabeceras-http.sh'
+
+permissions:
+  contents: read
+
+jobs:
+  auditar-cabeceras:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar inventario temporal CE-311
+        shell: bash
+        run: |
+          cat > hosts-ce311.txt <<'EOF'
+          V-05|www.politica-datos-personales.ccsm.org.co
+          V-06|bi.ccsm.org.co
+          V-07|ns2.ccsm.org.co
+          V-08|cav.ccsm.org.co
+          V-09|api.ccsm.org.co
+          V-10|onemall.ccsm.org.co
+          V-11|sgc.ccsm.org.co
+          V-12|magdalena-crece.ccsm.org.co
+          V-13|www.aviso-de-privacidad.ccsm.org.co
+          V-14|eventos.ccsm.org.co
+          V-15|apps.ccsm.org.co
+          EOF
+
+      - name: Ejecutar verificador
+        id: audit
+        shell: bash
+        run: |
+          chmod +x scripts/security/verificar-cabeceras-http.sh
+          set +e
+          scripts/security/verificar-cabeceras-http.sh \
+            --hosts-file hosts-ce311.txt \
+            --output resultado-ce311-publico.csv \
+            | tee resultado-ce311-publico.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          echo "## Resultado CE-311" >> "$GITHUB_STEP_SUMMARY"
+          echo "Codigo del verificador: $rc" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          cat resultado-ce311-publico.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar evidencia
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencia-ce311-cabeceras
+          path: |
+            resultado-ce311-publico.csv
+            resultado-ce311-publico.txt
+          if-no-files-found: error
+          retention-days: 30
