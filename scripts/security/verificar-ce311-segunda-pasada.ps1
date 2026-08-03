@@ -45,20 +45,23 @@ function Get-FinalHeaderBlock {
 
 function Get-HeaderValue {
     param(
-        [Parameter(Mandatory = $true)]
-        [AllowNull()]
-        [AllowEmptyCollection()]
-        [string[]]$HeaderBlock,
+        [Parameter(Mandatory = $false)]
+        $HeaderBlock,
 
         [Parameter(Mandatory = $true)]
         [string]$Name
     )
 
-    if ($null -eq $HeaderBlock -or $HeaderBlock.Count -eq 0) {
+    if ($null -eq $HeaderBlock) {
         return ""
     }
 
-    foreach ($line in $HeaderBlock) {
+    foreach ($lineObject in @($HeaderBlock)) {
+        $line = [string]$lineObject
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+
         if ($line -match ('^{0}\s*:\s*(.*)$' -f [regex]::Escape($Name))) {
             return $Matches[1].Trim()
         }
