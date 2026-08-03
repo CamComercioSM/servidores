@@ -45,9 +45,18 @@ function Get-FinalHeaderBlock {
 
 function Get-HeaderValue {
     param(
-        [Parameter(Mandatory = $true)][string[]]$HeaderBlock,
-        [Parameter(Mandatory = $true)][string]$Name
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [string[]]$HeaderBlock,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name
     )
+
+    if ($null -eq $HeaderBlock -or $HeaderBlock.Count -eq 0) {
+        return ""
+    }
 
     foreach ($line in $HeaderBlock) {
         if ($line -match ('^{0}\s*:\s*(.*)$' -f [regex]::Escape($Name))) {
