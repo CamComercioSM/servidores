@@ -98,8 +98,20 @@ $resultados = foreach ($item in $items) {
             "https://$($item.Host)/"
         )
 
-        $meta = & $curl.Source @arguments 2> $tempError
-        $exitCode = $LASTEXITCODE
+        # Windows PowerShell 5.1 convierte la salida STDERR de programas nativos
+        # en NativeCommandError cuando ErrorActionPreference=Stop. Curl usa STDERR
+        # para reportar fallos TLS esperados durante la auditoria; deben registrarse
+        # en el CSV sin detener la evaluacion de los siguientes hosts.
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'SilentlyContinue'
+            $meta = & $curl.Source @arguments 2> $tempError
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+
         $metaText = ($meta -join '').Trim()
 
         if ($metaText -match '^(\d{3})\|(.*)$') {
@@ -138,6 +150,12 @@ $resultados = foreach ($item in $items) {
             $status = 'INCOMPLETO'
         }
 
+        $errorText = ""
+        if (Test-Path -LiteralPath $tempError) {
+            $errorText = [string](Get-Content -LiteralPath $tempError -Raw -ErrorAction SilentlyContinue)
+            $errorText = ($errorText -replace "`r?`n", ' ').Trim()
+        }
+
         [pscustomobject]@{
             fecha_hora = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz')
             hallazgo = $item.Hallazgo
@@ -156,7 +174,7 @@ $resultados = foreach ($item in $items) {
             cabeceras_faltantes = ($missing -join ';')
             resultado = $status
             curl_exit_code = $exitCode
-            error = ((Get-Content -LiteralPath $tempError -Raw -ErrorAction SilentlyContinue) -replace "`r?`n", ' ').Trim()
+            error = $errorText
         }
     }
     finally {
