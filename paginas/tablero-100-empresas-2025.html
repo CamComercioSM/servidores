@@ -516,6 +516,15 @@
     }
 }
 
+/* Ajuste del alto cuando se usa el tablero móvil en orientación horizontal */
+@media (max-width: 1024px) and (orientation: landscape) {
+    .tablero-looker.is-mobile-dashboard,
+    .tablero-looker.is-mobile-dashboard iframe {
+        height: clamp(360px, 92svh, 620px);
+        min-height: 360px;
+    }
+}
+
 /* Accesibilidad: desactivar movimientos si el usuario lo prefiere */
 @media (prefers-reduced-motion: reduce) {
     *,
@@ -658,7 +667,8 @@
 
         <iframe
             id="iframe-tablero"
-            src="https://datastudio.google.com/embed/reporting/de972263-bedf-4464-98ea-b2faecdcd022/page/p_cl2wug1v4d"
+            data-src-escritorio="https://datastudio.google.com/embed/reporting/de972263-bedf-4464-98ea-b2faecdcd022/page/p_cl2wug1v4d"
+            data-src-movil="https://datastudio.google.com/embed/reporting/12654213-7849-4409-879a-7149451b1fe8/page/p_cl2wug1v4d"
             title="Tablero interactivo Las 100 empresas más grandes del Magdalena 2025"
             loading="lazy"
             allowfullscreen
@@ -668,6 +678,7 @@
 
     <div class="estudio-economico__acciones animar-entrada">
         <a
+            id="enlace-tablero"
             href="https://datastudio.google.com/reporting/de972263-bedf-4464-98ea-b2faecdcd022"
             target="_blank"
             rel="noopener noreferrer"
@@ -702,20 +713,84 @@
 (function () {
     var contenedor = document.getElementById("contenedor-tablero");
     var iframe = document.getElementById("iframe-tablero");
+    var enlace = document.getElementById("enlace-tablero");
     var elementos = document.querySelectorAll(".animar-entrada");
+    var consultaAnchoMovil = window.matchMedia("(max-width: 820px)");
+    var consultaDispositivoTactil = window.matchMedia(
+        "(max-width: 1024px) and (pointer: coarse)"
+    );
+    var temporizadorCarga;
 
-    if (iframe && contenedor) {
-        iframe.addEventListener("load", function () {
-            contenedor.classList.add("is-loaded");
-        });
+    var urls = {
+        escritorio: {
+            embed: iframe ? iframe.getAttribute("data-src-escritorio") : "",
+            completa:
+                "https://datastudio.google.com/reporting/" +
+                "de972263-bedf-4464-98ea-b2faecdcd022/page/p_cl2wug1v4d"
+        },
+        movil: {
+            embed: iframe ? iframe.getAttribute("data-src-movil") : "",
+            completa:
+                "https://datastudio.google.com/reporting/" +
+                "12654213-7849-4409-879a-7149451b1fe8/page/p_cl2wug1v4d"
+        }
+    };
+
+    function usarVersionMovil() {
+        return (
+            consultaAnchoMovil.matches ||
+            consultaDispositivoTactil.matches
+        );
+    }
+
+    function cargarTableroAdecuado() {
+        if (!iframe || !contenedor) {
+            return;
+        }
+
+        var esMovil = usarVersionMovil();
+        var configuracion = esMovil ? urls.movil : urls.escritorio;
+
+        contenedor.classList.toggle("is-mobile-dashboard", esMovil);
+
+        if (enlace) {
+            enlace.href = configuracion.completa;
+        }
+
+        if (iframe.getAttribute("src") === configuracion.embed) {
+            return;
+        }
+
+        window.clearTimeout(temporizadorCarga);
+        contenedor.classList.remove("is-loaded");
+        iframe.setAttribute("src", configuracion.embed);
 
         /*
          * Evita que el indicador permanezca indefinidamente
          * si el evento load tarda en ser detectado.
          */
-        window.setTimeout(function () {
+        temporizadorCarga = window.setTimeout(function () {
             contenedor.classList.add("is-loaded");
         }, 12000);
+    }
+
+    function escucharCambios(consulta) {
+        if (typeof consulta.addEventListener === "function") {
+            consulta.addEventListener("change", cargarTableroAdecuado);
+        } else if (typeof consulta.addListener === "function") {
+            consulta.addListener(cargarTableroAdecuado);
+        }
+    }
+
+    if (iframe && contenedor) {
+        iframe.addEventListener("load", function () {
+            window.clearTimeout(temporizadorCarga);
+            contenedor.classList.add("is-loaded");
+        });
+
+        escucharCambios(consultaAnchoMovil);
+        escucharCambios(consultaDispositivoTactil);
+        cargarTableroAdecuado();
     }
 
     if ("IntersectionObserver" in window) {
@@ -729,7 +804,7 @@
                 });
             },
             {
-                threshold: 0.12
+                threshold: 0.12 
             }
         );
 
