@@ -1,0 +1,24 @@
+ID    HOST                                        ALCANCE  HTTP CF  RESULTADO CABECERAS FALTANTES
+V-05  www.politica-datos-personales.ccsm.org.co   PUBLICO  000  NO  ERROR_CONEXION Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-05  www.politica-datos-personales.ccsm.org.co   ORIGEN   403  NO  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-06  bi.ccsm.org.co                              PUBLICO  403  SI  NO_CONCLUYENTE_HTTP ninguna
+V-06  bi.ccsm.org.co                              ORIGEN   200  NO  INCOMPLETO Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-07  ns2.ccsm.org.co                             PUBLICO  000  NO  ERROR_CONEXION Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-07  ns2.ccsm.org.co                             ORIGEN   403  NO  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-08  cav.ccsm.org.co                             PUBLICO  403  SI  NO_CONCLUYENTE_HTTP ninguna
+V-08  cav.ccsm.org.co                             ORIGEN   403  NO  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-09  api.ccsm.org.co                             PUBLICO  403  SI  NO_CONCLUYENTE_HTTP ninguna
+V-09  api.ccsm.org.co                             ORIGEN   403  NO  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-11  sgc.ccsm.org.co                             PUBLICO  200  NO  INCOMPLETO Strict-Transport-Security;Permissions-Policy
+V-11  sgc.ccsm.org.co                             ORIGEN   403  NO  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-12  magdalena-crece.ccsm.org.co                 PUBLICO  403  SI  NO_CONCLUYENTE_HTTP Strict-Transport-Security
+V-12  magdalena-crece.ccsm.org.co                 ORIGEN   403  NO  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-13  www.aviso-de-privacidad.ccsm.org.co         PUBLICO  000  NO  ERROR_CONEXION Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-13  www.aviso-de-privacidad.ccsm.org.co         ORIGEN   403  NO  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-14  eventos.ccsm.org.co                         PUBLICO  200  SI  INCOMPLETO Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-14  eventos.ccsm.org.co                         ORIGEN   403  NO  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+V-15  apps.ccsm.org.co                            PUBLICO  403  SI  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Content-Type-Options;Content-Security-Policy;Permissions-Policy
+V-15  apps.ccsm.org.co                            ORIGEN   403  NO  NO_CONCLUYENTE_HTTP Strict-Transport-Security;X-Frame-Options;X-Content-Type-Options;Content-Security-Policy;Referrer-Policy;Permissions-Policy
+
+Resultado detallado: resultado-ce311-origen-190.csv
+Se encontraron problemas en 10 de 10 respuestas publicas.

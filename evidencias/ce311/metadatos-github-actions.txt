@@ -1,4 +1,5 @@
-fecha_utc=2026-08-04T13:10:18Z
-workflow_run=30912485561
-commit_evaluado=bd390318e85c569b21406e55305cdf2046ef33e2
-codigo_verificador=40
+fecha_utc=2026-08-04T13:12:06Z
+workflow_run=30912623036
+commit_evaluado=e4729f41d34929265b123ceafcd9f4190e0ed52e
+codigo_verificador_publico=40
+codigo_verificador_origen=40
