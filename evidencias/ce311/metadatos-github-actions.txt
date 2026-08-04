@@ -1,0 +1,4 @@
+fecha_utc=2026-08-04T13:08:40Z
+workflow_run=30912345842
+commit_evaluado=72505d75f6c89a7f1a4236635f01248dce027166
+codigo_verificador=40
