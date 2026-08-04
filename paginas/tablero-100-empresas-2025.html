@@ -1,0 +1,745 @@
+<style>
+:root {
+    --ccsm-navy: #082b5c;
+    --ccsm-blue: #1469b8;
+    --ccsm-blue-light: #eaf4ff;
+    --ccsm-green: #79b33a;
+    --ccsm-yellow: #fcb716;
+    --ccsm-text: #24364b;
+    --ccsm-muted: #63758a;
+    --ccsm-border: #dce6f0;
+    --ccsm-white: #ffffff;
+    --ccsm-shadow: 0 18px 45px rgba(8, 43, 92, 0.12);
+}
+
+/* Ajustes de la plantilla PageGear */
+.bg-title-ccstm,
+.bg-title-ccstm::before {
+    max-height: 80px;
+}
+
+@media (min-width: 991px) {
+    .bg-title-ccstm,
+    .bg-title-ccstm img,
+    .bg-title-ccstm::before {
+        height: 80px;
+    }
+}
+
+.site-content {
+    padding-top: 0 !important;
+}
+
+/* Contenedor general */
+.estudio-economico {
+    width: 100%;
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 30px 18px 60px;
+    color: var(--ccsm-text);
+}
+
+/* Hero */
+.estudio-economico__hero {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(28px, 5vw, 64px);
+    margin-bottom: 28px;
+    border-radius: 22px;
+    color: var(--ccsm-white);
+    background:
+        radial-gradient(
+            circle at 85% 15%,
+            rgba(20, 105, 184, 0.55),
+            transparent 34%
+        ),
+        linear-gradient(
+            135deg,
+            #061f45 0%,
+            var(--ccsm-navy) 48%,
+            #0d4f91 100%
+        );
+    box-shadow: var(--ccsm-shadow);
+    isolation: isolate;
+}
+
+.estudio-economico__hero::before,
+.estudio-economico__hero::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.estudio-economico__hero::before {
+    width: 330px;
+    height: 330px;
+    top: -210px;
+    left: -130px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.estudio-economico__hero::after {
+    width: 180px;
+    height: 180px;
+    right: -70px;
+    bottom: -100px;
+    background: rgba(121, 179, 58, 0.12);
+}
+
+.estudio-economico__etiqueta {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 18px;
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.estudio-economico__etiqueta::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ccsm-green);
+    box-shadow: 0 0 0 6px rgba(121, 179, 58, 0.15);
+    animation: pulsoIndicador 2s ease-in-out infinite;
+}
+
+.estudio-economico__hero h1 {
+    max-width: 980px;
+    margin: 0 0 18px;
+    color: var(--ccsm-white);
+    font-size: clamp(2rem, 5vw, 4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+}
+
+.estudio-economico__descripcion {
+    max-width: 850px;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.84);
+    font-size: clamp(1rem, 1.5vw, 1.2rem);
+    line-height: 1.7;
+}
+
+.estudio-economico__linea {
+    width: 100px;
+    height: 4px;
+    margin-top: 26px;
+    border-radius: 999px;
+    background: linear-gradient(
+        90deg,
+        var(--ccsm-green),
+        var(--ccsm-yellow)
+    );
+}
+
+/* Ficha técnica */
+.estudio-economico__ficha {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin-bottom: 28px;
+}
+
+.estudio-economico__dato {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 116px;
+    padding: 20px;
+    overflow: hidden;
+    border: 1px solid var(--ccsm-border);
+    border-radius: 16px;
+    background: var(--ccsm-white);
+    box-shadow: 0 10px 30px rgba(8, 43, 92, 0.07);
+    transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease,
+        border-color 0.25s ease;
+}
+
+.estudio-economico__dato::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 70px;
+    height: 4px;
+    border-radius: 4px 0 0 0;
+    background: var(--ccsm-blue);
+    transition: width 0.3s ease;
+}
+
+.estudio-economico__dato:hover {
+    transform: translateY(-4px);
+    border-color: rgba(20, 105, 184, 0.35);
+    box-shadow: 0 16px 36px rgba(8, 43, 92, 0.12);
+}
+
+.estudio-economico__dato:hover::after {
+    width: 100%;
+}
+
+.estudio-economico__icono {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 54px;
+    height: 54px;
+    border-radius: 15px;
+    color: var(--ccsm-blue);
+    background: var(--ccsm-blue-light);
+}
+
+.estudio-economico__icono svg {
+    width: 27px;
+    height: 27px;
+}
+
+.estudio-economico__dato-contenido {
+    min-width: 0;
+}
+
+.estudio-economico__dato strong,
+.estudio-economico__dato span {
+    display: block;
+}
+
+.estudio-economico__dato strong {
+    margin-bottom: 5px;
+    color: var(--ccsm-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+.estudio-economico__dato span {
+    color: var(--ccsm-navy);
+    font-size: 1.02rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+/* Encabezado del tablero */
+.tablero-seccion__encabezado {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin: 36px 0 16px;
+}
+
+.tablero-seccion__encabezado h2 {
+    margin: 0 0 6px;
+    color: var(--ccsm-navy);
+    font-size: clamp(1.45rem, 3vw, 2rem);
+    font-weight: 800;
+}
+
+.tablero-seccion__encabezado p {
+    margin: 0;
+    color: var(--ccsm-muted);
+    line-height: 1.6;
+}
+
+.tablero-seccion__estado {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 13px;
+    border-radius: 999px;
+    color: #3d6b16;
+    background: #edf7e4;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.tablero-seccion__estado::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ccsm-green);
+}
+
+/* Contenedor Looker Studio */
+.tablero-looker {
+    position: relative;
+    width: 100%;
+    min-height: 520px;
+    overflow: hidden;
+    border: 1px solid var(--ccsm-border);
+    border-radius: 18px;
+    background: #edf2f7;
+    box-shadow: var(--ccsm-shadow);
+}
+
+.tablero-looker::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 3;
+    height: 5px;
+    background: linear-gradient(
+        90deg,
+        var(--ccsm-green),
+        var(--ccsm-yellow),
+        var(--ccsm-blue)
+    );
+}
+
+.tablero-looker iframe {
+    position: relative;
+    z-index: 2;
+    display: block;
+    width: 100%;
+    height: 75vh;
+    min-height: 520px;
+    border: 0;
+    background: var(--ccsm-white);
+    opacity: 0;
+    transition: opacity 0.45s ease;
+}
+
+.tablero-looker.is-loaded iframe {
+    opacity: 1;
+}
+
+/* Estado de carga */
+.tablero-looker__carga {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 14px;
+    padding: 30px;
+    text-align: center;
+    color: var(--ccsm-muted);
+    background:
+        linear-gradient(
+            110deg,
+            #edf2f7 8%,
+            #f8fafc 18%,
+            #edf2f7 33%
+        );
+    background-size: 200% 100%;
+    animation: brilloCarga 1.6s linear infinite;
+    transition:
+        opacity 0.35s ease,
+        visibility 0.35s ease;
+}
+
+.tablero-looker.is-loaded .tablero-looker__carga {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.tablero-looker__spinner {
+    width: 42px;
+    height: 42px;
+    border: 4px solid rgba(20, 105, 184, 0.16);
+    border-top-color: var(--ccsm-blue);
+    border-radius: 50%;
+    animation: giroSpinner 0.8s linear infinite;
+}
+
+.tablero-looker__carga strong {
+    color: var(--ccsm-navy);
+    font-size: 1rem;
+}
+
+/* Acciones */
+.estudio-economico__acciones {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    margin-top: 22px;
+}
+
+.boton-tablero {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 22px;
+    overflow: hidden;
+    border: 1px solid var(--ccsm-navy);
+    border-radius: 999px;
+    color: var(--ccsm-white) !important;
+    background: var(--ccsm-navy);
+    box-shadow: 0 10px 22px rgba(8, 43, 92, 0.18);
+    font-weight: 700;
+    text-decoration: none !important;
+    transition:
+        transform 0.25s ease,
+        background 0.25s ease,
+        box-shadow 0.25s ease;
+}
+
+.boton-tablero::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -80%;
+    width: 55%;
+    height: 100%;
+    transform: skewX(-24deg);
+    background: rgba(255, 255, 255, 0.2);
+    transition: left 0.55s ease;
+}
+
+.boton-tablero:hover {
+    transform: translateY(-2px);
+    color: var(--ccsm-white) !important;
+    background: var(--ccsm-blue);
+    box-shadow: 0 14px 28px rgba(8, 43, 92, 0.24);
+}
+
+.boton-tablero:hover::before {
+    left: 135%;
+}
+
+.boton-tablero svg {
+    width: 19px;
+    height: 19px;
+}
+
+/* Animaciones de entrada */
+.animar-entrada {
+    opacity: 0;
+    transform: translateY(24px);
+}
+
+.animar-entrada.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+        opacity 0.65s ease,
+        transform 0.65s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.estudio-economico__dato:nth-child(2).is-visible {
+    transition-delay: 0.1s;
+}
+
+.estudio-economico__dato:nth-child(3).is-visible {
+    transition-delay: 0.2s;
+}
+
+@keyframes pulsoIndicador {
+    0%,
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 5px rgba(121, 179, 58, 0.14);
+    }
+
+    50% {
+        transform: scale(1.15);
+        box-shadow: 0 0 0 9px rgba(121, 179, 58, 0.05);
+    }
+}
+
+@keyframes giroSpinner {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes brilloCarga {
+    to {
+        background-position-x: -200%;
+    }
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .estudio-economico__ficha {
+        grid-template-columns: 1fr;
+    }
+
+    .tablero-seccion__encabezado {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 768px) {
+    .estudio-economico {
+        padding: 18px 12px 40px;
+    }
+
+    .estudio-economico__hero {
+        padding: 30px 22px;
+        border-radius: 16px;
+    }
+
+    .estudio-economico__dato {
+        min-height: auto;
+        padding: 17px;
+    }
+
+    .tablero-looker {
+        min-height: 620px;
+        border-radius: 13px;
+    }
+
+    .tablero-looker iframe {
+        height: 75vh;
+        min-height: 620px;
+    }
+
+    .estudio-economico__acciones {
+        justify-content: stretch;
+    }
+
+    .boton-tablero {
+        width: 100%;
+    }
+}
+
+/* Accesibilidad: desactivar movimientos si el usuario lo prefiere */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .animar-entrada {
+        opacity: 1;
+        transform: none;
+    }
+}
+</style>
+
+<section class="estudio-economico">
+
+    <header class="estudio-economico__hero animar-entrada">
+        <p class="estudio-economico__etiqueta">
+            Tablero interactivo de Estudios Económicos
+        </p>
+
+        <h1>Las 100 empresas más grandes del Magdalena 2025</h1>
+
+        <p class="estudio-economico__descripcion">
+            Explore el análisis financiero y económico de las principales
+            empresas del departamento del Magdalena, sus resultados,
+            participación sectorial e indicadores más representativos.
+        </p>
+
+        <div class="estudio-economico__linea" aria-hidden="true"></div>
+    </header>
+
+    <div class="estudio-economico__ficha">
+
+        <article class="estudio-economico__dato animar-entrada">
+            <div class="estudio-economico__icono" aria-hidden="true">
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                    <path d="M16 3v4M8 3v4M3 11h18"></path>
+                    <path d="M8 15h2M14 15h2M8 18h2M14 18h2"></path>
+                </svg>
+            </div>
+
+            <div class="estudio-economico__dato-contenido">
+                <strong>Año fiscal</strong>
+                <span>2025</span>
+            </div>
+        </article>
+
+        <article class="estudio-economico__dato animar-entrada">
+            <div class="estudio-economico__icono" aria-hidden="true">
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <path d="M12 7v5l3 2"></path>
+                </svg>
+            </div>
+
+            <div class="estudio-economico__dato-contenido">
+                <strong>Corte de la información</strong>
+                <span>30 de junio de 2026</span>
+            </div>
+        </article>
+
+        <article class="estudio-economico__dato animar-entrada">
+            <div class="estudio-economico__icono" aria-hidden="true">
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M3 21h18"></path>
+                    <path d="M6 21V10h4v11"></path>
+                    <path d="M14 21V3h4v18"></path>
+                    <path d="M4 10l4-4 4 3 5-5 3 3"></path>
+                </svg>
+            </div>
+
+            <div class="estudio-economico__dato-contenido">
+                <strong>Entidad responsable</strong>
+                <span>
+                    Cámara de Comercio de Santa Marta para el Magdalena
+                </span>
+            </div>
+        </article>
+
+    </div>
+
+    <div class="tablero-seccion__encabezado animar-entrada">
+        <div>
+            <h2>Consulte el tablero</h2>
+            <p>
+                Utilice el menú lateral, los filtros y controles del informe
+                para explorar los resultados.
+            </p>
+        </div>
+
+        <span class="tablero-seccion__estado">
+            Informe disponible
+        </span>
+    </div>
+
+    <div
+        class="tablero-looker animar-entrada"
+        id="contenedor-tablero">
+
+        <div
+            class="tablero-looker__carga"
+            id="carga-tablero"
+            aria-live="polite">
+
+            <span
+                class="tablero-looker__spinner"
+                aria-hidden="true">
+            </span>
+
+            <strong>Cargando tablero interactivo</strong>
+
+            <span>
+                Este proceso puede tardar algunos segundos.
+            </span>
+        </div>
+
+        <iframe
+            id="iframe-tablero"
+            src="https://datastudio.google.com/embed/reporting/de972263-bedf-4464-98ea-b2faecdcd022/page/p_cl2wug1v4d"
+            title="Tablero interactivo Las 100 empresas más grandes del Magdalena 2025"
+            loading="lazy"
+            allowfullscreen
+            referrerpolicy="strict-origin-when-cross-origin">
+        </iframe>
+    </div>
+
+    <div class="estudio-economico__acciones animar-entrada">
+        <a
+            href="https://datastudio.google.com/reporting/de972263-bedf-4464-98ea-b2faecdcd022"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="boton-tablero">
+
+            <span>Abrir tablero en pantalla completa</span>
+
+            <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true">
+                <path d="M14 3h7v7"></path>
+                <path d="M10 14L21 3"></path>
+                <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"></path>
+            </svg>
+        </a>
+    </div>
+
+    <noscript>
+        <p>
+            Para consultar este tablero es necesario habilitar JavaScript.
+        </p>
+    </noscript>
+
+</section>
+
+<script>
+(function () {
+    var contenedor = document.getElementById("contenedor-tablero");
+    var iframe = document.getElementById("iframe-tablero");
+    var elementos = document.querySelectorAll(".animar-entrada");
+
+    if (iframe && contenedor) {
+        iframe.addEventListener("load", function () {
+            contenedor.classList.add("is-loaded");
+        });
+
+        /*
+         * Evita que el indicador permanezca indefinidamente
+         * si el evento load tarda en ser detectado.
+         */
+        window.setTimeout(function () {
+            contenedor.classList.add("is-loaded");
+        }, 12000);
+    }
+
+    if ("IntersectionObserver" in window) {
+        var observador = new IntersectionObserver(
+            function (entradas, observer) {
+                entradas.forEach(function (entrada) {
+                    if (entrada.isIntersecting) {
+                        entrada.target.classList.add("is-visible");
+                        observer.unobserve(entrada.target);
+                    }
+                });
+            },
+            {
+                threshold: 0.12
+            }
+        );
+
+        elementos.forEach(function (elemento) {
+            observador.observe(elemento);
+        });
+    } else {
+        elementos.forEach(function (elemento) {
+            elemento.classList.add("is-visible");
+        });
+    }
+})();
+</script>
