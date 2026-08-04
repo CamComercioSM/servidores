@@ -55,6 +55,48 @@ jobs:
           cat resultado-ce311-publico.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Diagnosticar DNS y destinos finales
+        if: always()
+        shell: bash
+        run: |
+          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
+          : > diagnostico-ce311-dns-destinos.txt
+
+          echo '=== DNS DE LOS 11 HOSTS ===' >> diagnostico-ce311-dns-destinos.txt
+          while IFS='|' read -r id host; do
+            echo "[$id] $host" >> diagnostico-ce311-dns-destinos.txt
+            for resolver in system 1.1.1.1 8.8.8.8; do
+              if [[ "$resolver" == system ]]; then
+                answers="$({ dig +short CNAME "$host"; dig +short A "$host"; dig +short AAAA "$host"; } 2>/dev/null | sed '/^$/d' | sort -u | paste -sd ';' -)"
+              else
+                answers="$({ dig +short @"$resolver" CNAME "$host"; dig +short @"$resolver" A "$host"; dig +short @"$resolver" AAAA "$host"; } 2>/dev/null | sed '/^$/d' | sort -u | paste -sd ';' -)"
+              fi
+              echo "  resolver=$resolver respuesta=${answers:-SIN_RESPUESTA}" >> diagnostico-ce311-dns-destinos.txt
+            done
+          done < hosts-ce311.txt
+
+          echo >> diagnostico-ce311-dns-destinos.txt
+          echo '=== VARIANTES SIN WWW Y DESTINOS CONOCIDOS ===' >> diagnostico-ce311-dns-destinos.txt
+          cat > destinos-ce311.txt <<'EOF'
+          politica-datos-personales.ccsm.org.co
+          aviso-de-privacidad.ccsm.org.co
+          www.ccsm.org.co
+          sites.google.com
+          magdalenacrece.com
+          eventos.appsicam.net
+          apps.sicam32.net
+          EOF
+
+          while read -r host; do
+            [[ -n "$host" ]] || continue
+            dns="$({ dig +short CNAME "$host"; dig +short A "$host"; dig +short AAAA "$host"; } 2>/dev/null | sed '/^$/d' | sort -u | paste -sd ';' -)"
+            set +e
+            meta="$(curl -k -sS -L --compressed --http1.1 --tlsv1.2 --max-redirs 5 --connect-timeout 15 --max-time 45 -A "$UA" -o /dev/null -w '%{http_code}|%{url_effective}' "https://${host}/" 2>&1)"
+            rc=$?
+            set -e
+            echo "$host | dns=${dns:-SIN_RESPUESTA} | curl_rc=$rc | $meta" >> diagnostico-ce311-dns-destinos.txt
+          done < destinos-ce311.txt
+
       - name: Publicar artefacto temporal
         if: always()
         uses: actions/upload-artifact@v4
@@ -63,6 +105,7 @@ jobs:
           path: |
             resultado-ce311-publico.csv
             resultado-ce311-publico.txt
+            diagnostico-ce311-dns-destinos.txt
           if-no-files-found: error
           retention-days: 30
 
@@ -73,6 +116,7 @@ jobs:
           mkdir -p evidencias/ce311
           cp resultado-ce311-publico.csv evidencias/ce311/resultado-ce311-github-actions.csv
           cp resultado-ce311-publico.txt evidencias/ce311/resultado-ce311-github-actions.txt
+          cp diagnostico-ce311-dns-destinos.txt evidencias/ce311/diagnostico-ce311-dns-destinos.txt
           {
             echo "fecha_utc=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "workflow_run=${GITHUB_RUN_ID}"
