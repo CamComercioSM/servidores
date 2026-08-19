@@ -3,13 +3,14 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 rem Nombre: clonar-bases-sicam-produccion-local.bat
 rem Estado: experimental
-rem Proposito: Reemplazar las bases SICAM locales por una copia logica exacta de produccion.
+rem Proposito: Reemplazar las bases SICAM locales por una copia logica de produccion.
 rem Alcance: Bases sicam_* definidas en DATABASES. No modifica bases de sistema MariaDB/MySQL.
 rem Requisitos: mariadb.exe, mariadb-dump.exe y archivos de configuracion externos al repositorio.
 rem Parametros: --dry-run, --validate, --schema-only, --full, --yes, --prod-config RUTA, --local-config RUTA.
 rem Impacto: Destructivo sobre las bases locales listadas; el dump contiene DROP DATABASE y CREATE DATABASE.
+rem Tolerancia: Si falla una tabla durante la importacion, continua con las siguientes sentencias; si falla una base, continua con la siguiente base.
 rem Reversion: Restaurar un respaldo local previo si se requiere recuperar el estado anterior.
-rem Evidencia: Salida de consola por base y codigo de salida 0 al finalizar.
+rem Evidencia: Salida de consola y resumen final de bases correctas, parciales y fallidas.
 rem Responsable: Gestion de TI - Camara de Comercio de Santa Marta para el Magdalena.
 rem Jira: CE-746
 
@@ -25,6 +26,12 @@ set "VALIDATE_ONLY=0"
 set "AUTO_YES=0"
 set "CLONE_MODE=full"
 set "DUMP_DATA_OPTION="
+set /a TOTAL_DATABASES=0
+set /a SUCCESS_DATABASES=0
+set /a PARTIAL_DATABASES=0
+set /a FAILED_DATABASES=0
+set "PARTIAL_LIST="
+set "FAILED_LIST="
 
 set "DATABASES=sicam_aplicaciones sicam_apps sicam_citurcam sicam_comercial sicam_datospersonales sicam_historia sicam_logs sicam_maestras sicam_modelodatos sicam_planeador sicam_principal sicam_registros sicam_robots sicam_saladescanso sicam_seguridad sicam_servicios sicam_talentohumano sicam_tejidoempresarial sicam_warehouse"
 
@@ -117,6 +124,8 @@ if /I "%CLONE_MODE%"=="schema-only" (
 ) else (
     echo Se copiaran estructuras, vistas, triggers, rutinas, eventos y TODOS los datos.
 )
+echo Si una tabla o sentencia falla durante la importacion, se registrara el error y se continuara.
+echo Si una base no puede exportarse o importarse, se continuara con la siguiente base.
 echo No se compara el estado actual del destino y no se crea respaldo local automaticamente.
 set "CONFIRMACION="
 set /p "CONFIRMACION=Escriba CLONAR SICAM para continuar: "
@@ -136,15 +145,26 @@ if errorlevel 1 (
 call :log "Inicio de clonacion en modo %CLONE_MODE%."
 
 for %%D in (%DATABASES%) do (
+    set /a TOTAL_DATABASES+=1
     call :clone_database "%%D"
-    if errorlevel 1 (
-        rd /s /q "%TEMP_DIR%" >nul 2>&1
-        exit /b 40
+    set "CLONE_RESULT=!ERRORLEVEL!"
+
+    if "!CLONE_RESULT!"=="0" (
+        set /a SUCCESS_DATABASES+=1
+    ) else if "!CLONE_RESULT!"=="2" (
+        set /a PARTIAL_DATABASES+=1
+        set "PARTIAL_LIST=!PARTIAL_LIST! %%D"
+    ) else (
+        set /a FAILED_DATABASES+=1
+        set "FAILED_LIST=!FAILED_LIST! %%D"
     )
 )
 
+call :print_summary
 rd /s /q "%TEMP_DIR%" >nul 2>&1
-call :log "Clonacion finalizada correctamente en modo %CLONE_MODE%."
+
+if %FAILED_DATABASES% GTR 0 exit /b 40
+if %PARTIAL_DATABASES% GTR 0 exit /b 41
 exit /b 0
 
 :resolve_commands
@@ -154,8 +174,14 @@ where mariadb-dump >nul 2>&1
 if not errorlevel 1 set "DB_DUMP=mariadb-dump"
 
 if exist "%ProgramFiles%\MariaDB 12.3\bin\mariadb.exe" if exist "%ProgramFiles%\MariaDB 12.3\bin\mariadb-dump.exe" (
-    if not exist "%DB_CLIENT%" set "DB_CLIENT=%ProgramFiles%\MariaDB 12.3\bin\mariadb.exe"
-    if not exist "%DB_DUMP%" set "DB_DUMP=%ProgramFiles%\MariaDB 12.3\bin\mariadb-dump.exe"
+    if "%DB_CLIENT%"=="mariadb" (
+        where mariadb >nul 2>&1
+        if errorlevel 1 set "DB_CLIENT=%ProgramFiles%\MariaDB 12.3\bin\mariadb.exe"
+    )
+    if "%DB_DUMP%"=="mariadb-dump" (
+        where mariadb-dump >nul 2>&1
+        if errorlevel 1 set "DB_DUMP=%ProgramFiles%\MariaDB 12.3\bin\mariadb-dump.exe"
+    )
 )
 
 if "%DB_CLIENT%"=="mariadb" (
@@ -210,31 +236,64 @@ exit /b 0
 :clone_database
 set "DB_NAME=%~1"
 set "DUMP_FILE=%TEMP_DIR%\%DB_NAME%.sql"
+set "DUMP_ERROR_FILE=%TEMP_DIR%\%DB_NAME%-dump-errors.log"
+set "IMPORT_ERROR_FILE=%TEMP_DIR%\%DB_NAME%-import-errors.log"
 
 call :log "Exportando %DB_NAME% desde produccion en modo %CLONE_MODE%."
-"%DB_DUMP%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --databases "%DB_NAME%" --add-drop-database --single-transaction --quick --routines --events --triggers --hex-blob --default-character-set=utf8mb4 --no-tablespaces %DUMP_DATA_OPTION% > "%DUMP_FILE%"
+"%DB_DUMP%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --databases "%DB_NAME%" --add-drop-database --single-transaction --quick --routines --events --triggers --hex-blob --default-character-set=utf8mb4 --no-tablespaces %DUMP_DATA_OPTION% > "%DUMP_FILE%" 2> "%DUMP_ERROR_FILE%"
 if errorlevel 1 (
-    del /q "%DUMP_FILE%" >nul 2>&1
-    call :error "Fallo la exportacion de %DB_NAME%. El destino local no fue modificado para esta base."
+    call :error "Fallo la exportacion de %DB_NAME%. Se omitira esta base y se continuara con la siguiente."
+    if exist "%DUMP_ERROR_FILE%" type "%DUMP_ERROR_FILE%"
+    del /q "%DUMP_FILE%" "%DUMP_ERROR_FILE%" >nul 2>&1
     exit /b 1
 )
 
 for %%F in ("%DUMP_FILE%") do if %%~zF LEQ 0 (
-    del /q "%DUMP_FILE%" >nul 2>&1
-    call :error "El dump de %DB_NAME% fue generado vacio."
+    call :error "El dump de %DB_NAME% fue generado vacio. Se omitira esta base y se continuara con la siguiente."
+    del /q "%DUMP_FILE%" "%DUMP_ERROR_FILE%" >nul 2>&1
     exit /b 1
 )
 
+del /q "%DUMP_ERROR_FILE%" >nul 2>&1
 call :log "Ejecutando automaticamente el SQL de %DB_NAME% sobre el servidor local."
-"%DB_CLIENT%" --defaults-extra-file="%LOCAL_CONFIG%" --default-character-set=utf8mb4 < "%DUMP_FILE%"
-if errorlevel 1 (
-    del /q "%DUMP_FILE%" >nul 2>&1
-    call :error "Fallo la importacion de %DB_NAME%. La base local puede haber quedado parcialmente restaurada."
-    exit /b 1
+"%DB_CLIENT%" --defaults-extra-file="%LOCAL_CONFIG%" --default-character-set=utf8mb4 --force < "%DUMP_FILE%" 2> "%IMPORT_ERROR_FILE%"
+set "IMPORT_EXIT_CODE=!ERRORLEVEL!"
+
+set "HAS_SQL_ERRORS=0"
+if exist "%IMPORT_ERROR_FILE%" (
+    findstr /B /C:"ERROR " "%IMPORT_ERROR_FILE%" >nul 2>&1
+    if not errorlevel 1 set "HAS_SQL_ERRORS=1"
 )
 
-del /q "%DUMP_FILE%" >nul 2>&1
+if not "!IMPORT_EXIT_CODE!"=="0" set "HAS_SQL_ERRORS=1"
+
+if "!HAS_SQL_ERRORS!"=="1" (
+    call :error "La base %DB_NAME% fue importada parcialmente. Se encontraron errores, pero se continuo con las siguientes tablas/sentencias."
+    if exist "%IMPORT_ERROR_FILE%" type "%IMPORT_ERROR_FILE%"
+    del /q "%DUMP_FILE%" "%IMPORT_ERROR_FILE%" >nul 2>&1
+    exit /b 2
+)
+
+del /q "%DUMP_FILE%" "%IMPORT_ERROR_FILE%" >nul 2>&1
 call :log "Base %DB_NAME% clonada correctamente en modo %CLONE_MODE%."
+exit /b 0
+
+:print_summary
+echo.
+echo ============================================================
+echo RESUMEN DE CLONACION
+echo ============================================================
+echo Modo:                %CLONE_MODE%
+echo Bases procesadas:    !TOTAL_DATABASES!
+echo Correctas:           !SUCCESS_DATABASES!
+echo Parciales:           !PARTIAL_DATABASES!
+echo Fallidas/omitidas:   !FAILED_DATABASES!
+if !PARTIAL_DATABASES! GTR 0 echo Bases parciales:      !PARTIAL_LIST!
+if !FAILED_DATABASES! GTR 0 echo Bases fallidas:       !FAILED_LIST!
+echo ============================================================
+if !FAILED_DATABASES! GTR 0 call :error "La clonacion termino con bases fallidas u omitidas."
+if !PARTIAL_DATABASES! GTR 0 call :error "La clonacion termino con bases importadas parcialmente."
+if !FAILED_DATABASES! EQU 0 if !PARTIAL_DATABASES! EQU 0 call :log "Clonacion finalizada correctamente en modo %CLONE_MODE%."
 exit /b 0
 
 :log
@@ -255,6 +314,11 @@ echo.
 echo Modos de clonacion:
 echo   --schema-only  Reemplaza las bases locales copiando solo estructuras y objetos, sin filas de datos.
 echo   --full         Reemplaza las bases locales copiando estructuras, objetos y datos. Es el modo por defecto.
+echo.
+echo Tolerancia a errores:
+echo   Si falla una tabla o sentencia durante la importacion, mariadb --force continua con las siguientes.
+echo   Si falla el dump de una base, esa base se omite y el proceso continua con la siguiente.
+echo   Al terminar se muestra un resumen de bases correctas, parciales y fallidas.
 echo.
 echo Modos de comprobacion:
 echo   --dry-run      Solo muestra configuracion y alcance. No conecta ni modifica nada.
