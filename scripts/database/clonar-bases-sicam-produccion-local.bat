@@ -6,7 +6,7 @@ rem Estado: experimental
 rem Proposito: Reemplazar las bases SICAM locales por una copia logica exacta de produccion.
 rem Alcance: Bases sicam_* definidas en DATABASES. No modifica bases de sistema MariaDB/MySQL.
 rem Requisitos: mariadb.exe, mariadb-dump.exe y archivos de configuracion externos al repositorio.
-rem Parametros: --dry-run, --yes, --prod-config RUTA, --local-config RUTA.
+rem Parametros: --dry-run, --validate, --yes, --prod-config RUTA, --local-config RUTA.
 rem Impacto: Destructivo sobre las bases locales listadas; el dump contiene DROP DATABASE y CREATE DATABASE.
 rem Reversion: Restaurar un respaldo local previo si se requiere recuperar el estado anterior.
 rem Evidencia: Salida de consola por base y codigo de salida 0 al finalizar.
@@ -20,6 +20,7 @@ set "LOCAL_CONFIG=%CONFIG_DIR%\local.cnf"
 set "DB_CLIENT=mariadb"
 set "DB_DUMP=mariadb-dump"
 set "DRY_RUN=0"
+set "VALIDATE_ONLY=0"
 set "AUTO_YES=0"
 
 set "DATABASES=sicam_aplicaciones sicam_apps sicam_citurcam sicam_comercial sicam_datospersonales sicam_historia sicam_logs sicam_maestras sicam_modelodatos sicam_planeador sicam_principal sicam_registros sicam_robots sicam_saladescanso sicam_seguridad sicam_servicios sicam_talentohumano sicam_tejidoempresarial sicam_warehouse"
@@ -28,6 +29,11 @@ set "DATABASES=sicam_aplicaciones sicam_apps sicam_citurcam sicam_comercial sica
 if "%~1"=="" goto args_done
 if /I "%~1"=="--dry-run" (
     set "DRY_RUN=1"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="--validate" (
+    set "VALIDATE_ONLY=1"
     shift
     goto parse_args
 )
@@ -74,22 +80,16 @@ call :log "Configuracion destino: %LOCAL_CONFIG%"
 call :log "Bases que seran reemplazadas: %DATABASES%"
 
 if "%DRY_RUN%"=="1" (
-    call :log "Modo simulacion: no se exportara, eliminara ni importara ninguna base."
+    call :log "Modo simulacion: no se conectara, exportara, eliminara ni importara ninguna base."
     exit /b 0
 )
 
-call :log "Validando acceso al servidor de produccion."
-"%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" --batch --skip-column-names -e "SELECT 1;" >nul 2>&1
-if errorlevel 1 (
-    call :error "No fue posible conectar con la configuracion de produccion."
-    exit /b 30
-)
+call :validate_connections
+if errorlevel 1 exit /b 30
 
-call :log "Validando acceso al servidor MariaDB local."
-"%DB_CLIENT%" --defaults-extra-file="%LOCAL_CONFIG%" --batch --skip-column-names -e "SELECT 1;" >nul 2>&1
-if errorlevel 1 (
-    call :error "No fue posible conectar con la configuracion local."
-    exit /b 30
+if "%VALIDATE_ONLY%"=="1" (
+    call :log "Validacion finalizada correctamente. No se realizo ninguna clonacion."
+    exit /b 0
 )
 
 if "%AUTO_YES%"=="1" goto confirmed
@@ -124,6 +124,32 @@ for %%D in (%DATABASES%) do (
 
 rd /s /q "%TEMP_DIR%" >nul 2>&1
 call :log "Clonacion finalizada correctamente."
+exit /b 0
+
+:validate_connections
+call :log "Validando acceso al servidor de produccion."
+"%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" --batch --skip-column-names -e "SELECT VERSION(), CURRENT_USER();" 2>&1
+if errorlevel 1 (
+    call :error "No fue posible conectar con la configuracion de produccion."
+    exit /b 1
+)
+
+call :log "Validando acceso al servidor MariaDB local."
+"%DB_CLIENT%" --defaults-extra-file="%LOCAL_CONFIG%" --batch --skip-column-names -e "SELECT VERSION(), CURRENT_USER();" 2>&1
+if errorlevel 1 (
+    call :error "No fue posible conectar con la configuracion local."
+    exit /b 1
+)
+
+call :log "Validando existencia de las bases requeridas en produccion."
+for %%D in (%DATABASES%) do (
+    for /f "usebackq delims=" %%R in (`"%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" --batch --skip-column-names -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%%D';" 2^>nul`) do set "FOUND_DB=%%R"
+    if /I not "!FOUND_DB!"=="%%D" (
+        call :error "La base %%D no fue encontrada en produccion o no es visible para el usuario configurado."
+        exit /b 1
+    )
+    set "FOUND_DB="
+)
 exit /b 0
 
 :clone_database
@@ -171,7 +197,7 @@ call :error "Parametros invalidos."
 
 :usage
 echo Uso:
-echo   %SCRIPT_NAME% [--dry-run] [--yes] [--prod-config RUTA] [--local-config RUTA]
+echo   %SCRIPT_NAME% [--dry-run] [--validate] [--yes] [--prod-config RUTA] [--local-config RUTA]
 echo.
 echo Valores por defecto:
 echo   Produccion: %%APPDATA%%\SICAM\database-clone\produccion.cnf
