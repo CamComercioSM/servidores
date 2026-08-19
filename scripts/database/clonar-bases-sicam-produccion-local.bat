@@ -82,17 +82,19 @@ if errorlevel 1 (
     exit /b 30
 )
 
-if "%AUTO_YES%"=="0" (
-    echo.
-    echo ADVERTENCIA: esta operacion reemplazara por completo las bases SICAM locales listadas.
-    echo No se compara el estado actual del destino y no se crea respaldo local automaticamente.
-    set /p "CONFIRMACION=Escriba CLONAR SICAM para continuar: "
-    if /I not "%CONFIRMACION%"=="CLONAR SICAM" (
-        call :error "Operacion cancelada por el usuario."
-        exit /b 30
-    )
+if "%AUTO_YES%"=="1" goto confirmed
+
+echo.
+echo ADVERTENCIA: esta operacion reemplazara por completo las bases SICAM locales listadas.
+echo No se compara el estado actual del destino y no se crea respaldo local automaticamente.
+set "CONFIRMACION="
+set /p "CONFIRMACION=Escriba CLONAR SICAM para continuar: "
+if /I not "%CONFIRMACION%"=="CLONAR SICAM" (
+    call :error "Operacion cancelada por el usuario."
+    exit /b 30
 )
 
+:confirmed
 set "TEMP_DIR=%TEMP%\sicam-clone-%RANDOM%-%RANDOM%"
 mkdir "%TEMP_DIR%" >nul 2>&1
 if errorlevel 1 (
