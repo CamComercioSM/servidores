@@ -21,6 +21,12 @@ Repositorio institucional para centralizar, documentar y versionar scripts utili
 └── templates/             # Plantillas para nuevos scripts
 ```
 
+## Documentación
+
+- [Estándar para scripts operativos](docs/estandar-scripts.md)
+- [Clonación de bases SICAM de producción a entorno local](docs/clonar-bases-sicam-produccion-local.md)
+- [Catálogo de scripts](scripts/README.md)
+
 ## Reglas obligatorias
 
 1. No almacenar contraseñas, tokens, llaves privadas, certificados, secretos, archivos `.env`, respaldos ni volcados de bases de datos.
