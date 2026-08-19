@@ -14,6 +14,38 @@ Disponer de una operación manual y repetible para reemplazar las bases de datos
 
 No es una sincronización incremental. El estado previo de cada base local no se compara ni se conserva: el volcado generado incluye `DROP DATABASE` y `CREATE DATABASE`, por lo que la restauración sustituye la base local completa.
 
+El script genera el SQL temporal y lo ejecuta automáticamente sobre el servidor local. El operador no debe importar manualmente los archivos `.sql`.
+
+## Modos de clonación
+
+El script dispone de dos modos funcionales:
+
+### Solo esquema
+
+```bat
+scripts\database\clonar-bases-sicam-produccion-local.bat --schema-only
+```
+
+Reemplaza cada base local copiando:
+
+- base de datos;
+- tablas;
+- vistas;
+- índices y restricciones;
+- triggers;
+- procedimientos y funciones;
+- eventos.
+
+No copia filas de datos. Internamente utiliza `mariadb-dump --no-data` y ejecuta inmediatamente el SQL generado sobre el destino local.
+
+### Clonación completa
+
+```bat
+scripts\database\clonar-bases-sicam-produccion-local.bat --full
+```
+
+Reemplaza cada base local copiando tanto estructura como datos. Este es el modo predeterminado cuando no se especifica ninguno de los dos parámetros.
+
 ## Ambiente local validado
 
 El servidor local reporta:
@@ -27,7 +59,7 @@ El servidor local reporta:
 - Motor predeterminado: `InnoDB`.
 - `lower_case_table_names=1`.
 
-Estos datos fueron verificados el 2026-08-19 a partir de la información del servidor local compartida para CE-746.
+El origen validado durante CE-746 reporta MySQL `8.0.37-google`.
 
 ## Alcance
 
@@ -66,11 +98,13 @@ scripts/database/clonar-bases-sicam-produccion-local.bat
 Por cada base, el proceso realiza:
 
 1. Exportación desde producción a un archivo temporal mediante `mariadb-dump`.
-2. Inclusión de estructura, datos, triggers, rutinas y eventos.
-3. Inclusión de `DROP DATABASE` y `CREATE DATABASE` en el volcado.
-4. Importación del volcado sobre el servidor MariaDB local mediante `mariadb`.
-5. Eliminación del archivo temporal al finalizar la base.
-6. Interrupción inmediata si falla la exportación o la importación.
+2. Inclusión de `DROP DATABASE` y `CREATE DATABASE` en el volcado.
+3. Inclusión de objetos de esquema, triggers, rutinas y eventos.
+4. Inclusión o exclusión de datos según el modo seleccionado.
+5. Validación de que el archivo SQL temporal no esté vacío.
+6. Ejecución automática del SQL sobre el servidor MariaDB local mediante `mariadb`.
+7. Eliminación del archivo temporal al finalizar la base.
+8. Interrupción inmediata si falla la exportación o la importación.
 
 Los archivos temporales se crean bajo `%TEMP%` y no dentro del repositorio.
 
@@ -78,7 +112,7 @@ Los archivos temporales se crean bajo `%TEMP%` y no dentro del repositorio.
 
 No se almacenan IP, usuarios ni contraseñas en Git.
 
-MariaDB no soporta el archivo `.mylogin.cnf` generado por `mysql_config_editor`, por lo que el script utiliza archivos de opciones externos al repositorio mediante `--defaults-extra-file`.
+El script utiliza archivos de opciones externos al repositorio mediante `--defaults-extra-file`.
 
 Rutas predeterminadas:
 
@@ -86,36 +120,6 @@ Rutas predeterminadas:
 %APPDATA%\SICAM\database-clone\produccion.cnf
 %APPDATA%\SICAM\database-clone\local.cnf
 ```
-
-Cree la carpeta:
-
-```bat
-mkdir "%APPDATA%\SICAM\database-clone"
-```
-
-Ejemplo de `local.cnf`:
-
-```ini
-[client]
-host=127.0.0.1
-port=3306
-user=root
-password=CLAVE_LOCAL
-protocol=tcp
-```
-
-Ejemplo de `produccion.cnf`:
-
-```ini
-[client]
-host=SERVIDOR_PRODUCCION
-port=3306
-user=USUARIO_PRODUCCION
-password=CLAVE_PRODUCCION
-protocol=tcp
-```
-
-Los valores reales se crean únicamente en el equipo del operador y nunca se versionan.
 
 ## Requisitos
 
@@ -126,79 +130,75 @@ Los valores reales se crean únicamente en el equipo del operador y nunca se ver
 - Usuario de producción con permisos de lectura suficientes para exportar objetos y datos.
 - Usuario local con permisos para eliminar, crear e importar las bases indicadas.
 
-## Ejecución
+## Ejecución y validación
 
-Primero realice la simulación:
-
-```bat
-scripts\database\clonar-bases-sicam-produccion-local.bat --dry-run
-```
-
-Luego ejecute la clonación:
+Simulación sin conexiones ni modificaciones:
 
 ```bat
-scripts\database\clonar-bases-sicam-produccion-local.bat
+scripts\database\clonar-bases-sicam-produccion-local.bat --dry-run --schema-only
+scripts\database\clonar-bases-sicam-produccion-local.bat --dry-run --full
 ```
 
-La ejecución interactiva exige escribir exactamente:
+Validación de conexiones y acceso a las bases, sin modificar el destino:
+
+```bat
+scripts\database\clonar-bases-sicam-produccion-local.bat --validate
+```
+
+Clonación únicamente de esquemas:
+
+```bat
+scripts\database\clonar-bases-sicam-produccion-local.bat --schema-only
+```
+
+Clonación completa con datos:
+
+```bat
+scripts\database\clonar-bases-sicam-produccion-local.bat --full
+```
+
+La ejecución destructiva exige escribir exactamente:
 
 ```text
 CLONAR SICAM
 ```
 
-Para una ejecución controlada donde se quiera omitir la confirmación manual:
-
-```bat
-scripts\database\clonar-bases-sicam-produccion-local.bat --yes
-```
-
-Para utilizar archivos de configuración en otras rutas:
-
-```bat
-scripts\database\clonar-bases-sicam-produccion-local.bat --prod-config "C:\ruta\produccion.cnf" --local-config "C:\ruta\local.cnf"
-```
+El parámetro `--yes` permite omitir esa confirmación en una ejecución previamente controlada.
 
 ## Pruebas y validaciones
 
-Antes de utilizar el script con todas las bases:
-
 1. Confirmar que `mariadb --version` y `mariadb-dump --version` responden correctamente.
-2. Ejecutar `--dry-run` y revisar la lista completa de bases.
-3. Verificar que existan ambos archivos `.cnf` externos al repositorio.
-4. Confirmar acceso con ambas configuraciones.
-5. Ejecutar inicialmente contra el MariaDB local controlado.
-6. Tras una clonación, validar en SQLyog que las bases esperadas existen y que las tablas críticas son consultables.
-7. Revisar especialmente rutinas, eventos, triggers y vistas si el servidor de producción utiliza `DEFINER` específicos.
+2. Ejecutar `--dry-run` para ambos modos y revisar el alcance informado.
+3. Ejecutar `--validate` y confirmar acceso al origen, destino y las 19 bases.
+4. Probar primero `--schema-only` para verificar compatibilidad estructural MySQL 8.0.37-google → MariaDB 12.3.2.
+5. Validar en SQLyog la creación de bases, tablas, vistas, triggers, rutinas y eventos.
+6. Confirmar que las tablas no contienen filas después de `--schema-only`.
+7. Después ejecutar `--full` y validar datos y objetos.
 
 ## Riesgos y consideraciones
 
-- La operación es destructiva sobre las bases locales listadas.
-- No se crea un respaldo automático del destino porque el objetivo solicitado es reemplazarlo directamente por producción.
+- Ambos modos son destructivos sobre las bases locales listadas.
+- `--schema-only` también elimina y recrea las bases; la diferencia es que no importa filas de datos.
+- No se crea respaldo automático del destino.
 - Si una importación falla después de ejecutar el `DROP DATABASE`, esa base local puede quedar incompleta. El proceso se detiene y reporta el error.
-- `--single-transaction` ofrece una copia consistente para tablas transaccionales como InnoDB. Tablas no transaccionales modificadas durante el dump pueden requerir una ventana controlada si se necesita consistencia absoluta.
-- La creación de rutinas, vistas o eventos puede requerir privilegios adicionales según los `DEFINER` existentes.
-- El archivo temporal contiene datos reales mientras dura la operación; se elimina tras cada base y también cuando se detecta un fallo.
-- Se eliminó `--set-gtid-purged=OFF` porque es una opción propia de `mysqldump` de MySQL y no forma parte de `mariadb-dump`.
+- El origen es MySQL 8.0.37-google y el destino MariaDB 12.3.2; pueden existir incompatibilidades puntuales de DDL, `DEFINER`, collations u objetos específicos.
+- `--single-transaction` se utiliza en la clonación completa para consistencia de tablas transaccionales.
+- El archivo temporal contiene datos reales únicamente en modo `--full`; se elimina inmediatamente después de importar cada base o cuando ocurre un fallo.
 
 ## Procedimiento de reversión
 
-El script no mantiene el estado local anterior.
-
-Si se necesita posibilidad de reversión, el operador debe crear previamente un respaldo local independiente. La recuperación consiste en restaurar ese respaldo sobre el servidor local.
-
-No debe ejecutarse una reversión contra producción.
+El script no mantiene el estado local anterior. Si se necesita posibilidad de reversión, el operador debe crear previamente un respaldo local independiente y restaurarlo manualmente.
 
 ## Evidencia mínima
 
 Registrar en Jira CE-746 o en la incidencia operativa correspondiente:
 
 - fecha y hora;
-- equipo o ambiente local utilizado;
 - commit o versión del script;
-- ejecución de `--dry-run`;
-- resultado final;
+- modo utilizado (`schema-only` o `full`);
+- resultado de `--validate`;
 - bases procesadas;
-- errores encontrados, si existen;
+- errores encontrados;
 - validación posterior realizada.
 
 Nunca registrar contraseñas, cadenas de conexión completas ni volcados SQL.
@@ -206,4 +206,5 @@ Nunca registrar contraseñas, cadenas de conexión completas ni volcados SQL.
 ## Historial
 
 - 2026-08-19: creación inicial del procedimiento y script asociado a CE-746.
-- 2026-08-19: ambiente local identificado como MariaDB 12.3.2; se reemplaza el uso de `mysql_config_editor`/`--login-path` por archivos `.cnf` externos y se adapta el script a `mariadb`/`mariadb-dump`.
+- 2026-08-19: ambiente local identificado como MariaDB 12.3.2 y origen como MySQL 8.0.37-google.
+- 2026-08-19: se agregan los modos `--schema-only` y `--full`; el BAT genera y ejecuta automáticamente cada SQL temporal sobre el servidor local.
