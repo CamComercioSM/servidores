@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 rem Nombre: clonar-bases-sicam-produccion-local.bat
 rem Estado: experimental
@@ -114,7 +114,6 @@ if errorlevel 1 (
 )
 
 call :log "Inicio de clonacion."
-
 for %%D in (%DATABASES%) do (
     call :clone_database "%%D"
     if errorlevel 1 (
@@ -144,10 +143,9 @@ if errorlevel 1 (
 
 call :log "Validando existencia de las bases requeridas en produccion."
 for %%D in (%DATABASES%) do (
-    set "FOUND_DB="
-    for /f "usebackq delims=" %%R in (`"%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --batch --skip-column-names -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%%D';" 2^>nul`) do set "FOUND_DB=%%R"
-    if /I not "!FOUND_DB!"=="%%D" (
-        call :error "La base %%D no fue encontrada en produccion o no es visible para el usuario configurado."
+    "%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --batch --skip-column-names -e "USE `%%D`; SELECT DATABASE();" >nul 2>&1
+    if errorlevel 1 (
+        call :error "La base %%D no fue encontrada en produccion o no es accesible para el usuario configurado."
         exit /b 1
     )
     call :log "Base %%D disponible en produccion."
