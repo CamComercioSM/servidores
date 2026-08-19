@@ -76,9 +76,7 @@ if /I "%~1"=="-h" goto usage
 goto invalid_args
 
 :args_done
-call :require_command "%DB_CLIENT%"
-if errorlevel 1 exit /b 10
-call :require_command "%DB_DUMP%"
+call :resolve_commands
 if errorlevel 1 exit /b 10
 
 if not exist "%PROD_CONFIG%" (
@@ -90,6 +88,8 @@ if not exist "%LOCAL_CONFIG%" (
     exit /b 30
 )
 
+call :log "Cliente MariaDB: %DB_CLIENT%"
+call :log "Dump MariaDB: %DB_DUMP%"
 call :log "Configuracion origen: %PROD_CONFIG%"
 call :log "Configuracion destino: %LOCAL_CONFIG%"
 call :log "Modo de clonacion: %CLONE_MODE%"
@@ -147,6 +147,40 @@ rd /s /q "%TEMP_DIR%" >nul 2>&1
 call :log "Clonacion finalizada correctamente en modo %CLONE_MODE%."
 exit /b 0
 
+:resolve_commands
+where mariadb >nul 2>&1
+if not errorlevel 1 set "DB_CLIENT=mariadb"
+where mariadb-dump >nul 2>&1
+if not errorlevel 1 set "DB_DUMP=mariadb-dump"
+
+if exist "%ProgramFiles%\MariaDB 12.3\bin\mariadb.exe" if exist "%ProgramFiles%\MariaDB 12.3\bin\mariadb-dump.exe" (
+    if not exist "%DB_CLIENT%" set "DB_CLIENT=%ProgramFiles%\MariaDB 12.3\bin\mariadb.exe"
+    if not exist "%DB_DUMP%" set "DB_DUMP=%ProgramFiles%\MariaDB 12.3\bin\mariadb-dump.exe"
+)
+
+if "%DB_CLIENT%"=="mariadb" (
+    where mariadb >nul 2>&1
+    if errorlevel 1 (
+        call :error "No se encontro mariadb.exe en PATH ni en la ruta conocida de MariaDB 12.3."
+        exit /b 1
+    )
+) else if not exist "%DB_CLIENT%" (
+    call :error "No se encontro el cliente MariaDB: %DB_CLIENT%"
+    exit /b 1
+)
+
+if "%DB_DUMP%"=="mariadb-dump" (
+    where mariadb-dump >nul 2>&1
+    if errorlevel 1 (
+        call :error "No se encontro mariadb-dump.exe en PATH ni en la ruta conocida de MariaDB 12.3."
+        exit /b 1
+    )
+) else if not exist "%DB_DUMP%" (
+    call :error "No se encontro mariadb-dump: %DB_DUMP%"
+    exit /b 1
+)
+exit /b 0
+
 :validate_connections
 call :log "Validando acceso al servidor de produccion."
 "%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --batch --skip-column-names -e "SELECT VERSION(), CURRENT_USER();" 2>&1
@@ -201,14 +235,6 @@ if errorlevel 1 (
 
 del /q "%DUMP_FILE%" >nul 2>&1
 call :log "Base %DB_NAME% clonada correctamente en modo %CLONE_MODE%."
-exit /b 0
-
-:require_command
-where "%~1" >nul 2>&1
-if errorlevel 1 (
-    call :error "No se encontro el comando requerido: %~1"
-    exit /b 1
-)
 exit /b 0
 
 :log
