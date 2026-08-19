@@ -10,6 +10,10 @@ Organice cada script según su función principal:
 - `security/`: endurecimiento, auditoría, revisión y respuesta.
 - `windows/`: PowerShell y administración de Windows Server.
 
+## Scripts de bases de datos
+
+- [`database/clonar-bases-sicam-produccion-local.bat`](database/clonar-bases-sicam-produccion-local.bat): reemplaza las bases SICAM locales por una copia lógica de producción. Consulte la [documentación del procedimiento](../docs/clonar-bases-sicam-produccion-local.md).
+
 ## Antes de incorporar un script
 
 1. Copie la plantilla desde `templates/`.
