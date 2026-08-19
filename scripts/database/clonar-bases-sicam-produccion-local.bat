@@ -1,12 +1,12 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 rem Nombre: clonar-bases-sicam-produccion-local.bat
 rem Estado: experimental
 rem Proposito: Reemplazar las bases SICAM locales por una copia logica exacta de produccion.
 rem Alcance: Bases sicam_* definidas en DATABASES. No modifica bases de sistema MariaDB/MySQL.
 rem Requisitos: mariadb.exe, mariadb-dump.exe y archivos de configuracion externos al repositorio.
-rem Parametros: --dry-run, --validate, --yes, --prod-config RUTA, --local-config RUTA.
+rem Parametros: --dry-run, --validate, --schema-only, --full, --yes, --prod-config RUTA, --local-config RUTA.
 rem Impacto: Destructivo sobre las bases locales listadas; el dump contiene DROP DATABASE y CREATE DATABASE.
 rem Reversion: Restaurar un respaldo local previo si se requiere recuperar el estado anterior.
 rem Evidencia: Salida de consola por base y codigo de salida 0 al finalizar.
@@ -23,6 +23,8 @@ set "PROD_TLS_OPTION=--disable-ssl-verify-server-cert"
 set "DRY_RUN=0"
 set "VALIDATE_ONLY=0"
 set "AUTO_YES=0"
+set "CLONE_MODE=full"
+set "DUMP_DATA_OPTION="
 
 set "DATABASES=sicam_aplicaciones sicam_apps sicam_citurcam sicam_comercial sicam_datospersonales sicam_historia sicam_logs sicam_maestras sicam_modelodatos sicam_planeador sicam_principal sicam_registros sicam_robots sicam_saladescanso sicam_seguridad sicam_servicios sicam_talentohumano sicam_tejidoempresarial sicam_warehouse"
 
@@ -35,6 +37,18 @@ if /I "%~1"=="--dry-run" (
 )
 if /I "%~1"=="--validate" (
     set "VALIDATE_ONLY=1"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="--schema-only" (
+    set "CLONE_MODE=schema-only"
+    set "DUMP_DATA_OPTION=--no-data"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="--full" (
+    set "CLONE_MODE=full"
+    set "DUMP_DATA_OPTION="
     shift
     goto parse_args
 )
@@ -78,6 +92,7 @@ if not exist "%LOCAL_CONFIG%" (
 
 call :log "Configuracion origen: %PROD_CONFIG%"
 call :log "Configuracion destino: %LOCAL_CONFIG%"
+call :log "Modo de clonacion: %CLONE_MODE%"
 call :log "Bases que seran reemplazadas: %DATABASES%"
 
 if "%DRY_RUN%"=="1" (
@@ -97,6 +112,11 @@ if "%AUTO_YES%"=="1" goto confirmed
 
 echo.
 echo ADVERTENCIA: esta operacion reemplazara por completo las bases SICAM locales listadas.
+if /I "%CLONE_MODE%"=="schema-only" (
+    echo Se copiaran solamente estructuras, vistas, triggers, rutinas y eventos. NO se copiaran datos.
+) else (
+    echo Se copiaran estructuras, vistas, triggers, rutinas, eventos y TODOS los datos.
+)
 echo No se compara el estado actual del destino y no se crea respaldo local automaticamente.
 set "CONFIRMACION="
 set /p "CONFIRMACION=Escriba CLONAR SICAM para continuar: "
@@ -113,7 +133,8 @@ if errorlevel 1 (
     exit /b 40
 )
 
-call :log "Inicio de clonacion."
+call :log "Inicio de clonacion en modo %CLONE_MODE%."
+
 for %%D in (%DATABASES%) do (
     call :clone_database "%%D"
     if errorlevel 1 (
@@ -123,7 +144,7 @@ for %%D in (%DATABASES%) do (
 )
 
 rd /s /q "%TEMP_DIR%" >nul 2>&1
-call :log "Clonacion finalizada correctamente."
+call :log "Clonacion finalizada correctamente en modo %CLONE_MODE%."
 exit /b 0
 
 :validate_connections
@@ -156,15 +177,21 @@ exit /b 0
 set "DB_NAME=%~1"
 set "DUMP_FILE=%TEMP_DIR%\%DB_NAME%.sql"
 
-call :log "Exportando %DB_NAME% desde produccion."
-"%DB_DUMP%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --databases "%DB_NAME%" --add-drop-database --single-transaction --quick --routines --events --triggers --hex-blob --default-character-set=utf8mb4 --no-tablespaces > "%DUMP_FILE%"
+call :log "Exportando %DB_NAME% desde produccion en modo %CLONE_MODE%."
+"%DB_DUMP%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --databases "%DB_NAME%" --add-drop-database --single-transaction --quick --routines --events --triggers --hex-blob --default-character-set=utf8mb4 --no-tablespaces %DUMP_DATA_OPTION% > "%DUMP_FILE%"
 if errorlevel 1 (
     del /q "%DUMP_FILE%" >nul 2>&1
     call :error "Fallo la exportacion de %DB_NAME%. El destino local no fue modificado para esta base."
     exit /b 1
 )
 
-call :log "Reemplazando %DB_NAME% en el servidor local."
+for %%F in ("%DUMP_FILE%") do if %%~zF LEQ 0 (
+    del /q "%DUMP_FILE%" >nul 2>&1
+    call :error "El dump de %DB_NAME% fue generado vacio."
+    exit /b 1
+)
+
+call :log "Ejecutando automaticamente el SQL de %DB_NAME% sobre el servidor local."
 "%DB_CLIENT%" --defaults-extra-file="%LOCAL_CONFIG%" --default-character-set=utf8mb4 < "%DUMP_FILE%"
 if errorlevel 1 (
     del /q "%DUMP_FILE%" >nul 2>&1
@@ -173,7 +200,7 @@ if errorlevel 1 (
 )
 
 del /q "%DUMP_FILE%" >nul 2>&1
-call :log "Base %DB_NAME% clonada correctamente."
+call :log "Base %DB_NAME% clonada correctamente en modo %CLONE_MODE%."
 exit /b 0
 
 :require_command
@@ -197,7 +224,15 @@ call :error "Parametros invalidos."
 
 :usage
 echo Uso:
-echo   %SCRIPT_NAME% [--dry-run] [--validate] [--yes] [--prod-config RUTA] [--local-config RUTA]
+echo   %SCRIPT_NAME% [--schema-only ^| --full] [--dry-run ^| --validate] [--yes] [--prod-config RUTA] [--local-config RUTA]
+echo.
+echo Modos de clonacion:
+echo   --schema-only  Reemplaza las bases locales copiando solo estructuras y objetos, sin filas de datos.
+echo   --full         Reemplaza las bases locales copiando estructuras, objetos y datos. Es el modo por defecto.
+echo.
+echo Modos de comprobacion:
+echo   --dry-run      Solo muestra configuracion y alcance. No conecta ni modifica nada.
+echo   --validate     Valida conexiones y acceso a las bases. No modifica nada.
 echo.
 echo Valores por defecto:
 echo   Produccion: %%APPDATA%%\SICAM\database-clone\produccion.cnf
