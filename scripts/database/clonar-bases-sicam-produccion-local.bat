@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 rem Nombre: clonar-bases-sicam-produccion-local.bat
 rem Estado: experimental
@@ -19,6 +19,7 @@ set "PROD_CONFIG=%CONFIG_DIR%\produccion.cnf"
 set "LOCAL_CONFIG=%CONFIG_DIR%\local.cnf"
 set "DB_CLIENT=mariadb"
 set "DB_DUMP=mariadb-dump"
+set "PROD_TLS_OPTION=--disable-ssl-verify-server-cert"
 set "DRY_RUN=0"
 set "VALIDATE_ONLY=0"
 set "AUTO_YES=0"
@@ -128,7 +129,7 @@ exit /b 0
 
 :validate_connections
 call :log "Validando acceso al servidor de produccion."
-"%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" --batch --skip-column-names -e "SELECT VERSION(), CURRENT_USER();" 2>&1
+"%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --batch --skip-column-names -e "SELECT VERSION(), CURRENT_USER();" 2>&1
 if errorlevel 1 (
     call :error "No fue posible conectar con la configuracion de produccion."
     exit /b 1
@@ -143,12 +144,13 @@ if errorlevel 1 (
 
 call :log "Validando existencia de las bases requeridas en produccion."
 for %%D in (%DATABASES%) do (
-    for /f "usebackq delims=" %%R in (`"%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" --batch --skip-column-names -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%%D';" 2^>nul`) do set "FOUND_DB=%%R"
+    set "FOUND_DB="
+    for /f "usebackq delims=" %%R in (`"%DB_CLIENT%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --batch --skip-column-names -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%%D';" 2^>nul`) do set "FOUND_DB=%%R"
     if /I not "!FOUND_DB!"=="%%D" (
         call :error "La base %%D no fue encontrada en produccion o no es visible para el usuario configurado."
         exit /b 1
     )
-    set "FOUND_DB="
+    call :log "Base %%D disponible en produccion."
 )
 exit /b 0
 
@@ -157,7 +159,7 @@ set "DB_NAME=%~1"
 set "DUMP_FILE=%TEMP_DIR%\%DB_NAME%.sql"
 
 call :log "Exportando %DB_NAME% desde produccion."
-"%DB_DUMP%" --defaults-extra-file="%PROD_CONFIG%" --databases "%DB_NAME%" --add-drop-database --single-transaction --quick --routines --events --triggers --hex-blob --default-character-set=utf8mb4 --no-tablespaces > "%DUMP_FILE%"
+"%DB_DUMP%" --defaults-extra-file="%PROD_CONFIG%" %PROD_TLS_OPTION% --databases "%DB_NAME%" --add-drop-database --single-transaction --quick --routines --events --triggers --hex-blob --default-character-set=utf8mb4 --no-tablespaces > "%DUMP_FILE%"
 if errorlevel 1 (
     del /q "%DUMP_FILE%" >nul 2>&1
     call :error "Fallo la exportacion de %DB_NAME%. El destino local no fue modificado para esta base."
