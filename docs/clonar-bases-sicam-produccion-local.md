@@ -46,6 +46,22 @@ scripts\database\clonar-bases-sicam-produccion-local.bat --full
 
 Reemplaza cada base local copiando tanto estructura como datos. Este es el modo predeterminado cuando no se especifica ninguno de los dos parámetros.
 
+## Tolerancia a errores y continuidad
+
+La ejecución no se detiene ante el primer fallo.
+
+Durante la importación de una base se utiliza `mariadb --force`, de modo que si una sentencia, tabla, vista, trigger, rutina u otro objeto genera error, el cliente registra el error y continúa procesando las siguientes sentencias del mismo SQL.
+
+Si una base no puede exportarse, el dump queda vacío o la importación presenta errores, el script registra el resultado de esa base y continúa con la siguiente base de la lista.
+
+Al finalizar se presenta un resumen con tres estados:
+
+- `Correctas`: bases importadas sin errores detectados.
+- `Parciales`: bases donde hubo uno o más errores durante la importación, pero se continuó con las siguientes tablas y objetos.
+- `Fallidas/omitidas`: bases cuyo dump no pudo generarse o resultó inválido y no pudieron procesarse.
+
+La continuidad permite completar la mayor parte de la clonación aun cuando existan incompatibilidades puntuales entre MySQL 8.0.37-google y MariaDB 12.3.2.
+
 ## Ambiente local validado
 
 El servidor local reporta:
@@ -102,9 +118,11 @@ Por cada base, el proceso realiza:
 3. Inclusión de objetos de esquema, triggers, rutinas y eventos.
 4. Inclusión o exclusión de datos según el modo seleccionado.
 5. Validación de que el archivo SQL temporal no esté vacío.
-6. Ejecución automática del SQL sobre el servidor MariaDB local mediante `mariadb`.
-7. Eliminación del archivo temporal al finalizar la base.
-8. Interrupción inmediata si falla la exportación o la importación.
+6. Ejecución automática del SQL sobre el servidor MariaDB local mediante `mariadb --force`.
+7. Registro de errores de importación sin detener las siguientes sentencias.
+8. Continuación automática con la siguiente base, incluso cuando la base actual quede parcial o falle.
+9. Eliminación de archivos temporales al terminar el procesamiento de cada base.
+10. Presentación de un resumen final de resultados.
 
 Los archivos temporales se crean bajo `%TEMP%` y no dentro del repositorio.
 
@@ -125,8 +143,8 @@ Rutas predeterminadas:
 
 - Windows.
 - MariaDB Client instalado.
-- `mariadb.exe` disponible en `PATH`.
-- `mariadb-dump.exe` disponible en `PATH`.
+- `mariadb.exe` disponible en `PATH` o en la ruta conocida `C:\Program Files\MariaDB 12.3\bin\`.
+- `mariadb-dump.exe` disponible en `PATH` o en la ruta conocida `C:\Program Files\MariaDB 12.3\bin\`.
 - Usuario de producción con permisos de lectura suficientes para exportar objetos y datos.
 - Usuario local con permisos para eliminar, crear e importar las bases indicadas.
 
@@ -167,23 +185,26 @@ El parámetro `--yes` permite omitir esa confirmación en una ejecución previam
 
 ## Pruebas y validaciones
 
-1. Confirmar que `mariadb --version` y `mariadb-dump --version` responden correctamente.
-2. Ejecutar `--dry-run` para ambos modos y revisar el alcance informado.
-3. Ejecutar `--validate` y confirmar acceso al origen, destino y las 19 bases.
-4. Probar primero `--schema-only` para verificar compatibilidad estructural MySQL 8.0.37-google → MariaDB 12.3.2.
-5. Validar en SQLyog la creación de bases, tablas, vistas, triggers, rutinas y eventos.
-6. Confirmar que las tablas no contienen filas después de `--schema-only`.
-7. Después ejecutar `--full` y validar datos y objetos.
+1. Ejecutar `--dry-run` para ambos modos y revisar el alcance informado.
+2. Ejecutar `--validate` y confirmar acceso al origen, destino y las 19 bases.
+3. Probar primero `--schema-only` para verificar compatibilidad estructural MySQL 8.0.37-google → MariaDB 12.3.2.
+4. Confirmar que, si una sentencia falla, el script continúa con las siguientes tablas/objetos de la misma base.
+5. Confirmar que, si una base falla, la siguiente base sí es procesada.
+6. Revisar el resumen final de bases correctas, parciales y fallidas.
+7. Validar en SQLyog los objetos realmente creados.
+8. Después ejecutar `--full` y validar datos y objetos.
 
 ## Riesgos y consideraciones
 
 - Ambos modos son destructivos sobre las bases locales listadas.
 - `--schema-only` también elimina y recrea las bases; la diferencia es que no importa filas de datos.
 - No se crea respaldo automático del destino.
-- Si una importación falla después de ejecutar el `DROP DATABASE`, esa base local puede quedar incompleta. El proceso se detiene y reporta el error.
+- Una base marcada como `Parcial` puede haber quedado incompleta; debe revisarse el error mostrado en consola.
+- Una base marcada como `Fallida/omitida` no debe considerarse clonada.
 - El origen es MySQL 8.0.37-google y el destino MariaDB 12.3.2; pueden existir incompatibilidades puntuales de DDL, `DEFINER`, collations u objetos específicos.
+- El servidor local tiene `lower_case_table_names=1`, por lo que los nombres de tablas se materializan en minúsculas. La continuidad ante errores no cambia este comportamiento del servidor.
 - `--single-transaction` se utiliza en la clonación completa para consistencia de tablas transaccionales.
-- El archivo temporal contiene datos reales únicamente en modo `--full`; se elimina inmediatamente después de importar cada base o cuando ocurre un fallo.
+- El archivo temporal contiene datos reales únicamente en modo `--full`; se elimina después de procesar cada base.
 
 ## Procedimiento de reversión
 
@@ -197,7 +218,7 @@ Registrar en Jira CE-746 o en la incidencia operativa correspondiente:
 - commit o versión del script;
 - modo utilizado (`schema-only` o `full`);
 - resultado de `--validate`;
-- bases procesadas;
+- resumen final de bases correctas, parciales y fallidas;
 - errores encontrados;
 - validación posterior realizada.
 
@@ -208,3 +229,4 @@ Nunca registrar contraseñas, cadenas de conexión completas ni volcados SQL.
 - 2026-08-19: creación inicial del procedimiento y script asociado a CE-746.
 - 2026-08-19: ambiente local identificado como MariaDB 12.3.2 y origen como MySQL 8.0.37-google.
 - 2026-08-19: se agregan los modos `--schema-only` y `--full`; el BAT genera y ejecuta automáticamente cada SQL temporal sobre el servidor local.
+- 2026-08-19: se agrega tolerancia a errores para continuar con las siguientes tablas/sentencias y bases, incluyendo resumen final de resultados.
