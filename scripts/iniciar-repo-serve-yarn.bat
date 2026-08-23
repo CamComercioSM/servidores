@@ -1,28 +1,143 @@
 @echo off
-setlocal EnableExtensions
-title RUTAC Admin - Verificacion de entorno
+setlocal EnableExtensions EnableDelayedExpansion
+
+rem ============================================================================
+rem Iniciador generico de proyectos Laravel para Windows
+rem
+rem Uso normal:
+rem   - Copiar este BAT a la raiz del proyecto y ejecutarlo.
+rem
+rem Uso desde otra ubicacion:
+rem   iniciar-repo-serve-yarn.bat --project "C:\ruta\proyecto" --port 8030
+rem
+rem Parametros opcionales:
+rem   --project RUTA       Ruta de la raiz del proyecto Laravel.
+rem   --name NOMBRE        Nombre mostrado en consola y ventanas.
+rem   --host HOST          Host para php artisan serve. Predeterminado: 127.0.0.1.
+rem   --port PUERTO        Puerto preferido. Predeterminado: APP_PORT del .env o 8000.
+rem   --no-browser         No abrir el navegador al iniciar.
+rem   --skip-db-check      Omitir validacion de acceso a base de datos.
+rem   --strict-db-check    Detener el inicio si migrate:status falla.
+rem   --help               Mostrar ayuda.
+rem
+rem Variables opcionales en .env:
+rem   APP_NAME=Mi Proyecto
+rem   APP_PORT=8030
+rem
+rem El script detecta automaticamente Laravel, Composer y, si package.json tiene
+rem un script "dev", el gestor frontend segun pnpm-lock.yaml, yarn.lock o
+rem package-lock.json. Si no existe lock, utiliza npm.
+rem ============================================================================
 
 set "PROJECT_DIR=%~dp0"
 set "APP_HOST=127.0.0.1"
-set "APP_PORT=8000"
-set "APP_URL=http://%APP_HOST%:%APP_PORT%"
-set "PHP_UPPER_BOUND_WARNING=0"
+set "OPEN_BROWSER=1"
+set "CHECK_DATABASE=1"
+set "STRICT_DB_CHECK=0"
+set "HAS_FRONTEND=0"
+set "FRONTEND_MANAGER="
+set "FRONTEND_COMMAND="
+set "APP_URL="
+set "LARAVEL_VERSION="
+set "APP_KEY_VALUE="
+
+rem APP_NAME y APP_PORT pueden venir predefinidos desde el entorno.
+set "NAME_FROM_ARGUMENT=0"
+set "PORT_FROM_ARGUMENT=0"
+
+:parse_args
+if "%~1"=="" goto :args_done
+
+if /I "%~1"=="--help" goto :help
+
+if /I "%~1"=="--project" (
+  if "%~2"=="" (
+    echo [ERROR] --project requiere una ruta.
+    goto :usage_error
+  )
+  for %%I in ("%~2") do set "PROJECT_DIR=%%~fI"
+  shift
+  shift
+  goto :parse_args
+)
+
+if /I "%~1"=="--name" (
+  if "%~2"=="" (
+    echo [ERROR] --name requiere un valor.
+    goto :usage_error
+  )
+  set "APP_NAME=%~2"
+  set "NAME_FROM_ARGUMENT=1"
+  shift
+  shift
+  goto :parse_args
+)
+
+if /I "%~1"=="--host" (
+  if "%~2"=="" (
+    echo [ERROR] --host requiere un valor.
+    goto :usage_error
+  )
+  set "APP_HOST=%~2"
+  shift
+  shift
+  goto :parse_args
+)
+
+if /I "%~1"=="--port" (
+  if "%~2"=="" (
+    echo [ERROR] --port requiere un valor.
+    goto :usage_error
+  )
+  set "APP_PORT=%~2"
+  set "PORT_FROM_ARGUMENT=1"
+  shift
+  shift
+  goto :parse_args
+)
+
+if /I "%~1"=="--no-browser" (
+  set "OPEN_BROWSER=0"
+  shift
+  goto :parse_args
+)
+
+if /I "%~1"=="--skip-db-check" (
+  set "CHECK_DATABASE=0"
+  shift
+  goto :parse_args
+)
+
+if /I "%~1"=="--strict-db-check" (
+  set "CHECK_DATABASE=1"
+  set "STRICT_DB_CHECK=1"
+  shift
+  goto :parse_args
+)
+
+echo [ERROR] Parametro no reconocido: %~1
+goto :usage_error
+
+:args_done
+if not exist "%PROJECT_DIR%" (
+  echo [ERROR] La ruta del proyecto no existe: "%PROJECT_DIR%"
+  goto :error
+)
 
 cd /d "%PROJECT_DIR%"
-
-echo ============================================
-echo       RUTAC Admin - Inicio local
-echo ============================================
-echo.
-echo Verificando entorno antes de iniciar...
-echo.
+if errorlevel 1 (
+  echo [ERROR] No fue posible acceder al proyecto: "%PROJECT_DIR%"
+  goto :error
+)
 
 rem ------------------------------------------------------------
 rem 1. Estructura minima del proyecto
 rem ------------------------------------------------------------
 if not exist artisan (
-  echo [ERROR] No se encontro artisan.
-  echo Este archivo debe ejecutarse desde la raiz de RUTAC Admin.
+  echo [ERROR] No se encontro artisan en:
+  echo         %CD%
+  echo Este BAT debe ejecutarse desde la raiz de un proyecto Laravel
+  echo o recibir la ruta mediante --project.
   goto :error
 )
 
@@ -33,30 +148,82 @@ if not exist composer.json (
 )
 
 if not exist composer.lock (
-  echo [ERROR] No se encontro composer.lock.
-  echo RUTAC requiere el lock del repositorio para instalar versiones validadas.
+  echo [ADVERTENCIA] No se encontro composer.lock.
+  echo               Composer resolvera versiones desde composer.json.
+  echo               Para entornos controlados se recomienda versionar composer.lock.
+)
+
+if not exist .env (
+  if exist .env.example (
+    echo [INFO] No existe .env. Creando desde .env.example...
+    copy /y .env.example .env >nul
+    if errorlevel 1 (
+      echo [ERROR] No fue posible crear .env.
+      goto :error
+    )
+    echo [OK] Archivo .env creado.
+  ) else (
+    echo [ERROR] No existe .env ni .env.example.
+    echo No es posible preparar automaticamente la configuracion local.
+    goto :error
+  )
+) else (
+  echo [OK] Archivo .env disponible.
+)
+
+rem ------------------------------------------------------------
+rem 2. Nombre del proyecto y puerto preferido
+rem ------------------------------------------------------------
+if "%NAME_FROM_ARGUMENT%"=="0" if not defined APP_NAME (
+  for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+    if /I "%%A"=="APP_NAME" set "APP_NAME=%%B"
+  )
+)
+
+if defined APP_NAME (
+  set "APP_NAME=!APP_NAME:"=!"
+  if "!APP_NAME:~0,1!"=="'" if "!APP_NAME:~-1!"=="'" set "APP_NAME=!APP_NAME:~1,-1!"
+)
+
+if not defined APP_NAME (
+  for %%I in ("%CD%") do set "APP_NAME=%%~nxI"
+)
+
+if "%PORT_FROM_ARGUMENT%"=="0" if not defined APP_PORT (
+  for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+    if /I "%%A"=="APP_PORT" set "APP_PORT=%%B"
+  )
+)
+
+if not defined APP_PORT set "APP_PORT=8000"
+set "APP_PORT=!APP_PORT:"=!"
+
+where powershell >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] PowerShell no esta disponible en el PATH de Windows.
+  echo Se requiere para validar y seleccionar el puerto local.
   goto :error
 )
 
-if not exist package.json (
-  echo [ERROR] No se encontro package.json.
-  echo El proyecto frontend parece estar incompleto.
+powershell -NoProfile -Command "$p=0; if(-not [int]::TryParse('!APP_PORT!',[ref]$p)){exit 1}; if($p -lt 1 -or $p -gt 65535){exit 1}" >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Puerto invalido: !APP_PORT!
   goto :error
 )
 
-if not exist .env.example (
-  echo [ERROR] No se encontro .env.example.
-  echo No es posible preparar la configuracion local automaticamente.
-  goto :error
-)
+title !APP_NAME! - Verificacion de entorno
 
+echo ============================================
+echo       !APP_NAME! - Inicio local
+echo ============================================
+echo.
+echo Proyecto: %CD%
+echo Verificando entorno antes de iniciar...
+echo.
 echo [OK] Estructura basica del proyecto.
 
 rem ------------------------------------------------------------
-rem 2. Herramientas requeridas por Laravel 12, Materio y RUTAC
-rem    Materio: PHP 8.2+, Composer 2.2+, Node 18.12+.
-rem    PHP 8.5+: permitido con advertencia mientras Laravel Excel 3.1 +
-rem    PhpSpreadsheet 1.30.x mantengan un limite superior menor a 8.5.
+rem 3. PHP y Composer
 rem ------------------------------------------------------------
 where php >nul 2>nul
 if errorlevel 1 (
@@ -65,23 +232,7 @@ if errorlevel 1 (
 )
 
 for /f "delims=" %%V in ('php -r "echo PHP_VERSION;"') do set "PHP_VERSION=%%V"
-powershell -NoProfile -Command "$v=[version]'%PHP_VERSION%'; if ($v -lt [version]'8.2.0') { exit 1 }" >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] PHP %PHP_VERSION% no cumple el minimo requerido: PHP 8.2.0.
-  goto :error
-)
-
-powershell -NoProfile -Command "$v=[version]'%PHP_VERSION%'; if ($v -ge [version]'8.5.0') { exit 0 } else { exit 1 }" >nul 2>nul
-if not errorlevel 1 (
-  set "PHP_UPPER_BOUND_WARNING=1"
-  echo [ADVERTENCIA] PHP %PHP_VERSION% supera el limite declarado por una dependencia de Excel.
-  echo              RUTAC puede iniciar y ya fue probado localmente con PHP 8.5,
-  echo              pero Laravel Excel 3.1 / PhpSpreadsheet 1.30.x aun declaran PHP menor a 8.5.
-  echo              Composer ignorara solamente ese limite superior de PHP cuando sea necesario.
-  echo              Las exportaciones Excel deben mantenerse bajo observacion hasta actualizar la dependencia.
-) else (
-  echo [OK] PHP %PHP_VERSION%.
-)
+echo [OK] PHP !PHP_VERSION!.
 
 where composer >nul 2>nul
 if errorlevel 1 (
@@ -91,53 +242,10 @@ if errorlevel 1 (
 
 set "COMPOSER_VERSION="
 for /f "tokens=3" %%V in ('composer --version --no-ansi 2^>nul') do if not defined COMPOSER_VERSION set "COMPOSER_VERSION=%%V"
-if not defined COMPOSER_VERSION (
-  echo [ERROR] No fue posible determinar la version de Composer.
-  goto :error
-)
-powershell -NoProfile -Command "if ([version]'%COMPOSER_VERSION%' -lt [version]'2.2.0') { exit 1 }" >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] Composer %COMPOSER_VERSION% no cumple el minimo requerido: Composer 2.2.0.
-  goto :error
-)
-echo [OK] Composer %COMPOSER_VERSION%.
-
-where node >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] Node.js no esta disponible en el PATH de Windows.
-  goto :error
-)
-
-for /f "delims=" %%V in ('node --version') do set "NODE_VERSION=%%V"
-powershell -NoProfile -Command "$v='%NODE_VERSION%'.TrimStart('v'); if ([version]$v -lt [version]'18.12.0') { exit 1 }" >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] Node.js %NODE_VERSION% no cumple el minimo requerido: Node 18.12.0.
-  goto :error
-)
-echo [OK] Node.js %NODE_VERSION%.
-
-where yarn >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] Yarn no esta disponible en el PATH de Windows.
-  echo Instala o habilita Yarn antes de continuar.
-  goto :error
-)
-for /f "delims=" %%V in ('yarn --version 2^>nul') do set "YARN_VERSION=%%V"
-echo [OK] Yarn %YARN_VERSION%.
-
-rem ------------------------------------------------------------
-rem 3. Archivo de entorno
-rem ------------------------------------------------------------
-if not exist .env (
-  echo [INFO] No existe .env. Creando desde .env.example...
-  copy /y .env.example .env >nul
-  if errorlevel 1 (
-    echo [ERROR] No fue posible crear .env.
-    goto :error
-  )
-  echo [OK] Archivo .env creado.
+if defined COMPOSER_VERSION (
+  echo [OK] Composer !COMPOSER_VERSION!.
 ) else (
-  echo [OK] Archivo .env disponible.
+  echo [OK] Composer disponible.
 )
 
 rem ------------------------------------------------------------
@@ -145,17 +253,12 @@ rem 4. Dependencias PHP
 rem ------------------------------------------------------------
 if not exist vendor\autoload.php (
   echo [INFO] No se encontro vendor\autoload.php.
-  if "%PHP_UPPER_BOUND_WARNING%"=="1" (
-    echo [INFO] Ejecutando composer install desde composer.lock ignorando solo el limite superior de PHP...
-    call composer install --no-interaction --ignore-platform-req=php+
-  ) else (
-    echo [INFO] Ejecutando composer install desde composer.lock...
-    call composer install --no-interaction
-  )
+  echo [INFO] Ejecutando composer install...
+  call composer install --no-interaction
   if errorlevel 1 (
     echo [ERROR] composer install fallo.
-    echo No uses composer update como solucion automatica.
-    echo Revisa primero la version de PHP y los requisitos del lock.
+    echo Revisa la version de PHP, las extensiones requeridas y composer.lock.
+    echo No se ejecutara composer update automaticamente.
     goto :error
   )
 )
@@ -167,45 +270,27 @@ if not exist vendor\autoload.php (
 echo [OK] Dependencias PHP instaladas.
 
 echo [INFO] Validando requisitos de plataforma PHP y extensiones...
-if "%PHP_UPPER_BOUND_WARNING%"=="1" (
-  call composer install --dry-run --no-interaction --ignore-platform-req=php+ >nul
-  if errorlevel 1 (
-    echo [ERROR] El entorno no cumple uno o mas requisitos de Composer distintos del limite superior de PHP.
-    echo Ejecuta manualmente:
-    echo   composer install --dry-run --ignore-platform-req=php+
-    goto :error
-  )
-  echo [ADVERTENCIA] Requisitos validados permitiendo solo el limite superior de PHP.
-) else (
-  call composer check-platform-reqs --no-interaction
-  if errorlevel 1 (
-    echo [ERROR] PHP no cumple todos los requisitos de los paquetes instalados.
-    echo Revisa las extensiones PHP indicadas por Composer.
-    goto :error
-  )
-  echo [OK] Requisitos de plataforma PHP.
+call composer check-platform-reqs --no-interaction
+if errorlevel 1 (
+  echo [ERROR] El entorno no cumple los requisitos PHP de las dependencias instaladas.
+  echo Revisa el detalle informado por Composer.
+  goto :error
 )
+echo [OK] Requisitos de plataforma PHP.
 
 rem ------------------------------------------------------------
 rem 5. Version real de Laravel
 rem ------------------------------------------------------------
-set "LARAVEL_VERSION="
 for /f "tokens=3" %%V in ('php artisan --version 2^>nul') do set "LARAVEL_VERSION=%%V"
 if not defined LARAVEL_VERSION (
   echo [ERROR] Artisan no pudo inicializar Laravel.
   goto :error
 )
-powershell -NoProfile -Command "if ([version]'%LARAVEL_VERSION%' -lt [version]'12.0.0') { exit 1 }" >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] Laravel %LARAVEL_VERSION% no cumple el minimo requerido: Laravel 12.0.0.
-  goto :error
-)
-echo [OK] Laravel %LARAVEL_VERSION%.
+echo [OK] Laravel !LARAVEL_VERSION!.
 
 rem ------------------------------------------------------------
 rem 6. APP_KEY
 rem ------------------------------------------------------------
-set "APP_KEY_VALUE="
 for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
   if /I "%%A"=="APP_KEY" set "APP_KEY_VALUE=%%B"
 )
@@ -223,7 +308,7 @@ if not defined APP_KEY_VALUE (
 )
 
 rem ------------------------------------------------------------
-rem 7. Directorios escribibles requeridos por Laravel
+rem 7. Directorios de runtime requeridos por Laravel
 rem ------------------------------------------------------------
 if not exist storage\framework\cache mkdir storage\framework\cache >nul 2>nul
 if not exist storage\framework\sessions mkdir storage\framework\sessions >nul 2>nul
@@ -239,26 +324,75 @@ if not exist bootstrap\cache goto :storage_error
 echo [OK] Directorios de runtime de Laravel.
 
 rem ------------------------------------------------------------
-rem 8. Dependencias frontend
+rem 8. Frontend opcional: npm, Yarn o pnpm
 rem ------------------------------------------------------------
-if not exist node_modules\.bin\vite.cmd (
-  echo [INFO] No se encontro Vite en node_modules.
-  echo [INFO] Ejecutando yarn install...
-  call yarn install
-  if errorlevel 1 (
-    echo [ERROR] yarn install fallo.
-    goto :error
+if exist package.json (
+  echo [INFO] package.json detectado. Revisando script frontend "dev"...
+
+  set "DEV_SCRIPT=0"
+  for /f "delims=" %%V in ('powershell -NoProfile -Command "$ErrorActionPreference='Stop'; $p=Get-Content 'package.json' -Raw ^| ConvertFrom-Json; if($p.scripts.dev){'1'}else{'0'}" 2^>nul') do set "DEV_SCRIPT=%%V"
+
+  if "!DEV_SCRIPT!"=="1" (
+    set "HAS_FRONTEND=1"
+
+    where node >nul 2>nul
+    if errorlevel 1 (
+      echo [ERROR] El proyecto tiene un script frontend dev, pero Node.js no esta disponible.
+      goto :error
+    )
+
+    for /f "delims=" %%V in ('node --version 2^>nul') do set "NODE_VERSION=%%V"
+    echo [OK] Node.js !NODE_VERSION!.
+
+    if exist pnpm-lock.yaml (
+      set "FRONTEND_MANAGER=pnpm"
+    ) else if exist yarn.lock (
+      set "FRONTEND_MANAGER=yarn"
+    ) else if exist package-lock.json (
+      set "FRONTEND_MANAGER=npm"
+    ) else (
+      set "FRONTEND_MANAGER=npm"
+      echo [ADVERTENCIA] No se encontro lock de frontend. Se utilizara npm.
+    )
+
+    where !FRONTEND_MANAGER! >nul 2>nul
+    if errorlevel 1 (
+      echo [ERROR] El proyecto requiere !FRONTEND_MANAGER!, pero no esta disponible en el PATH.
+      goto :error
+    )
+
+    if /I "!FRONTEND_MANAGER!"=="yarn" set "FRONTEND_COMMAND=yarn dev"
+    if /I "!FRONTEND_MANAGER!"=="npm" set "FRONTEND_COMMAND=npm run dev"
+    if /I "!FRONTEND_MANAGER!"=="pnpm" set "FRONTEND_COMMAND=pnpm dev"
+
+    if not exist node_modules (
+      echo [INFO] No se encontro node_modules. Instalando dependencias con !FRONTEND_MANAGER!...
+
+      if /I "!FRONTEND_MANAGER!"=="yarn" call yarn install
+      if /I "!FRONTEND_MANAGER!"=="npm" call npm ci
+      if /I "!FRONTEND_MANAGER!"=="pnpm" call pnpm install
+
+      if errorlevel 1 (
+        echo [ERROR] La instalacion de dependencias frontend fallo.
+        goto :error
+      )
+    )
+
+    if not exist node_modules (
+      echo [ERROR] node_modules no esta disponible despues de instalar dependencias.
+      goto :error
+    )
+
+    echo [OK] Frontend detectado: !FRONTEND_COMMAND!.
+  ) else (
+    echo [INFO] package.json no define scripts.dev. No se levantara un servicio frontend.
   )
+) else (
+  echo [INFO] El proyecto no tiene package.json. Se iniciara solo Laravel.
 )
-
-if not exist node_modules\.bin\vite.cmd (
-  echo [ERROR] Vite sigue sin estar disponible despues de Yarn.
-  goto :error
-)
-echo [OK] Dependencias frontend instaladas.
 
 rem ------------------------------------------------------------
-rem 9. Configuracion Laravel y base de datos
+rem 9. Configuracion Laravel y comprobacion opcional de BD
 rem ------------------------------------------------------------
 echo [INFO] Limpiando caches de desarrollo...
 php artisan optimize:clear >nul
@@ -268,65 +402,128 @@ if errorlevel 1 (
 )
 echo [OK] Caches Laravel.
 
-echo [INFO] Verificando configuracion y acceso a base de datos...
-php artisan migrate:status --no-interaction >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] No fue posible consultar el estado de migraciones.
-  echo Revisa la configuracion de base de datos en .env y que el servidor este disponible.
-  echo Puedes diagnosticarlo manualmente con:
-  echo   php artisan migrate:status
-  goto :error
+if "!CHECK_DATABASE!"=="1" (
+  echo [INFO] Verificando acceso a base de datos mediante migrate:status...
+  php artisan migrate:status --no-interaction >nul 2>nul
+  if errorlevel 1 (
+    if "!STRICT_DB_CHECK!"=="1" (
+      echo [ERROR] No fue posible consultar el estado de migraciones.
+      echo Revisa la configuracion de base de datos en .env y el servidor de BD.
+      goto :error
+    ) else (
+      echo [ADVERTENCIA] No fue posible validar la base de datos.
+      echo               El inicio continuara. Usa --strict-db-check para bloquear ante este fallo.
+    )
+  ) else (
+    echo [OK] Conexion de base de datos disponible.
+  )
+) else (
+  echo [INFO] Validacion de base de datos omitida por parametro.
 )
-echo [OK] Conexion de base de datos disponible.
 
 rem ------------------------------------------------------------
-rem 10. Puerto Laravel
+rem 10. Puerto Laravel: usar preferido o siguiente disponible
 rem ------------------------------------------------------------
-powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort %APP_PORT% -State Listen -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }" >nul 2>nul
+set /a "PORT_START=!APP_PORT!"
+set /a "PORT_CANDIDATE=!PORT_START!"
+set /a "PORT_MAX=!PORT_START!+99"
+if !PORT_MAX! GTR 65535 set "PORT_MAX=65535"
+
+:find_port
+powershell -NoProfile -Command "if(Get-NetTCPConnection -LocalPort !PORT_CANDIDATE! -State Listen -ErrorAction SilentlyContinue){exit 1}else{exit 0}" >nul 2>nul
 if not errorlevel 1 (
-  echo [ERROR] El puerto %APP_PORT% ya esta ocupado.
-  echo Cierra el proceso que usa %APP_URL% o cambia APP_PORT en este archivo.
-  goto :error
+  set "APP_PORT=!PORT_CANDIDATE!"
+  goto :port_ready
 )
-echo [OK] Puerto %APP_PORT% disponible.
+
+if !PORT_CANDIDATE! GEQ !PORT_MAX! goto :port_error
+set /a "PORT_CANDIDATE+=1"
+goto :find_port
+
+:port_ready
+if not "!APP_PORT!"=="!PORT_START!" (
+  echo [ADVERTENCIA] El puerto !PORT_START! estaba ocupado. Se utilizara !APP_PORT!.
+) else (
+  echo [OK] Puerto !APP_PORT! disponible.
+)
+
+set "APP_URL=http://!APP_HOST!:!APP_PORT!"
 
 echo.
 echo ============================================
 echo       Entorno validado correctamente
 echo ============================================
-echo Laravel: %APP_URL%
-echo Vite:    yarn dev
+echo Proyecto: !APP_NAME!
+echo Laravel:  !LARAVEL_VERSION!
+echo URL:      !APP_URL!
+if "!HAS_FRONTEND!"=="1" echo Frontend: !FRONTEND_COMMAND!
 echo.
 echo Iniciando servicios...
 
-start "RUTAC Laravel" cmd /k "cd /d ""%PROJECT_DIR%"" && php artisan serve --host=%APP_HOST% --port=%APP_PORT%"
-start "RUTAC Vite" cmd /k "cd /d ""%PROJECT_DIR%"" && yarn dev"
+start "!APP_NAME! Laravel" cmd /k "cd /d ""%CD%"" && php artisan serve --host=!APP_HOST! --port=!APP_PORT!"
+
+if "!HAS_FRONTEND!"=="1" (
+  start "!APP_NAME! Frontend" cmd /k "cd /d ""%CD%"" && !FRONTEND_COMMAND!"
+)
 
 echo [INFO] Esperando que Laravel quede disponible...
-powershell -NoProfile -Command "$ok=$false; for($i=0; $i -lt 15; $i++){ if(Get-NetTCPConnection -LocalPort %APP_PORT% -State Listen -ErrorAction SilentlyContinue){$ok=$true; break}; Start-Sleep -Seconds 1 }; if(-not $ok){exit 1}" >nul 2>nul
+powershell -NoProfile -Command "$ok=$false; for($i=0; $i -lt 20; $i++){ if(Get-NetTCPConnection -LocalPort !APP_PORT! -State Listen -ErrorAction SilentlyContinue){$ok=$true; break}; Start-Sleep -Seconds 1 }; if(-not $ok){exit 1}" >nul 2>nul
 if errorlevel 1 (
-  echo [ADVERTENCIA] Laravel no confirmo escucha en el puerto %APP_PORT% despues de 15 segundos.
-  echo Revisa la ventana "RUTAC Laravel" para ver el error.
+  echo [ERROR] Laravel no confirmo escucha en el puerto !APP_PORT!.
+  echo Revisa la ventana "!APP_NAME! Laravel" para ver el error de inicio.
   goto :error
 )
 
 echo [OK] Laravel iniciado.
-start "" "%APP_URL%"
+
+if "!OPEN_BROWSER!"=="1" (
+  start "" "!APP_URL!"
+) else (
+  echo [INFO] Navegador no abierto por parametro.
+)
 
 echo.
-echo RUTAC Admin esta iniciando en %APP_URL%.
+echo !APP_NAME! esta disponible en !APP_URL!.
 endlocal
 exit /b 0
+
+:port_error
+echo [ERROR] No se encontro un puerto libre entre !PORT_START! y !PORT_MAX!.
+goto :error
 
 :storage_error
 echo [ERROR] No fue posible preparar los directorios de runtime de Laravel.
 echo Verifica permisos de escritura sobre storage y bootstrap\cache.
 goto :error
 
+:usage_error
+echo.
+echo Ejecuta este archivo con --help para ver los parametros disponibles.
+goto :error
+
+:help
+echo Iniciador generico de proyectos Laravel para Windows
+echo.
+echo Uso:
+echo   %~nx0 [opciones]
+echo.
+echo Opciones:
+echo   --project RUTA       Ruta de la raiz del proyecto Laravel.
+echo   --name NOMBRE        Nombre mostrado en consola y ventanas.
+echo   --host HOST          Host para php artisan serve.
+echo   --port PUERTO        Puerto preferido.
+echo   --no-browser         No abrir el navegador.
+echo   --skip-db-check      Omitir validacion de base de datos.
+echo   --strict-db-check    Fallar si migrate:status no puede ejecutarse.
+echo   --help               Mostrar esta ayuda.
+echo.
+endlocal
+exit /b 0
+
 :error
 echo.
 echo ============================================
-echo        RUTAC Admin NO fue iniciado
+echo        El proyecto NO fue iniciado
 echo ============================================
 echo Corrige el error indicado y vuelve a ejecutar este archivo.
 echo.
