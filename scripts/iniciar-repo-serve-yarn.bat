@@ -164,7 +164,7 @@ if "%NAME_FROM_ARGUMENT%"=="0" if not defined APP_NAME (
 )
 
 if defined APP_NAME (
-  set "APP_NAME=!APP_NAME:\"=!"
+  set "APP_NAME=!APP_NAME:"=!"
   if "!APP_NAME:~0,1!"=="'" if "!APP_NAME:~-1!"=="'" set "APP_NAME=!APP_NAME:~1,-1!"
 )
 
@@ -179,7 +179,7 @@ if "%PORT_FROM_ARGUMENT%"=="0" if not defined APP_PORT (
 )
 
 if not defined APP_PORT set "APP_PORT=8000"
-set "APP_PORT=!APP_PORT:\"=!"
+set "APP_PORT=!APP_PORT:"=!"
 
 where powershell >nul 2>nul
 if errorlevel 1 (
