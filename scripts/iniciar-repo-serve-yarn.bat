@@ -37,11 +37,10 @@ set "STRICT_DB_CHECK=0"
 set "HAS_FRONTEND=0"
 set "FRONTEND_MANAGER="
 set "FRONTEND_COMMAND="
+set "FRONTEND_INSTALL_COMMAND="
 set "APP_URL="
 set "LARAVEL_VERSION="
 set "APP_KEY_VALUE="
-
-rem APP_NAME y APP_PORT pueden venir predefinidos desde el entorno.
 set "NAME_FROM_ARGUMENT=0"
 set "PORT_FROM_ARGUMENT=0"
 
@@ -131,7 +130,7 @@ if errorlevel 1 (
 )
 
 rem ------------------------------------------------------------
-rem 1. Estructura minima del proyecto
+rem 1. Estructura minima y archivo de entorno
 rem ------------------------------------------------------------
 if not exist artisan (
   echo [ERROR] No se encontro artisan en:
@@ -249,7 +248,7 @@ if defined COMPOSER_VERSION (
 )
 
 rem ------------------------------------------------------------
-rem 4. Dependencias PHP
+rem 4. Dependencias PHP y requisitos reales del proyecto
 rem ------------------------------------------------------------
 if not exist vendor\autoload.php (
   echo [INFO] No se encontro vendor\autoload.php.
@@ -279,7 +278,7 @@ if errorlevel 1 (
 echo [OK] Requisitos de plataforma PHP.
 
 rem ------------------------------------------------------------
-rem 5. Version real de Laravel
+rem 5. Version real de Laravel, sin imponer una version fija
 rem ------------------------------------------------------------
 for /f "tokens=3" %%V in ('php artisan --version 2^>nul') do set "LARAVEL_VERSION=%%V"
 if not defined LARAVEL_VERSION (
@@ -346,13 +345,21 @@ if exist package.json (
 
     if exist pnpm-lock.yaml (
       set "FRONTEND_MANAGER=pnpm"
+      set "FRONTEND_INSTALL_COMMAND=pnpm install"
+      set "FRONTEND_COMMAND=pnpm dev"
     ) else if exist yarn.lock (
       set "FRONTEND_MANAGER=yarn"
+      set "FRONTEND_INSTALL_COMMAND=yarn install"
+      set "FRONTEND_COMMAND=yarn dev"
     ) else if exist package-lock.json (
       set "FRONTEND_MANAGER=npm"
+      set "FRONTEND_INSTALL_COMMAND=npm ci"
+      set "FRONTEND_COMMAND=npm run dev"
     ) else (
       set "FRONTEND_MANAGER=npm"
-      echo [ADVERTENCIA] No se encontro lock de frontend. Se utilizara npm.
+      set "FRONTEND_INSTALL_COMMAND=npm install"
+      set "FRONTEND_COMMAND=npm run dev"
+      echo [ADVERTENCIA] No se encontro lock de frontend. Se utilizara npm install.
     )
 
     where !FRONTEND_MANAGER! >nul 2>nul
@@ -361,17 +368,9 @@ if exist package.json (
       goto :error
     )
 
-    if /I "!FRONTEND_MANAGER!"=="yarn" set "FRONTEND_COMMAND=yarn dev"
-    if /I "!FRONTEND_MANAGER!"=="npm" set "FRONTEND_COMMAND=npm run dev"
-    if /I "!FRONTEND_MANAGER!"=="pnpm" set "FRONTEND_COMMAND=pnpm dev"
-
     if not exist node_modules (
-      echo [INFO] No se encontro node_modules. Instalando dependencias con !FRONTEND_MANAGER!...
-
-      if /I "!FRONTEND_MANAGER!"=="yarn" call yarn install
-      if /I "!FRONTEND_MANAGER!"=="npm" call npm ci
-      if /I "!FRONTEND_MANAGER!"=="pnpm" call pnpm install
-
+      echo [INFO] No se encontro node_modules. Ejecutando !FRONTEND_INSTALL_COMMAND!...
+      call !FRONTEND_INSTALL_COMMAND!
       if errorlevel 1 (
         echo [ERROR] La instalacion de dependencias frontend fallo.
         goto :error
