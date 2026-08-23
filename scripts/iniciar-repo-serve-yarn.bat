@@ -31,6 +31,7 @@ rem ============================================================================
 
 set "PROJECT_DIR=%~dp0"
 set "APP_HOST=0.0.0.0"
+set "BROWSER_HOST=127.0.0.1"
 set "OPEN_BROWSER=1"
 set "CHECK_DATABASE=1"
 set "STRICT_DB_CHECK=0"
@@ -39,6 +40,8 @@ set "FRONTEND_MANAGER="
 set "FRONTEND_COMMAND="
 set "FRONTEND_INSTALL_COMMAND="
 set "APP_URL="
+set "BROWSER_EXE="
+set "BROWSER_NAME="
 set "LARAVEL_VERSION="
 set "APP_KEY_VALUE="
 set "NAME_FROM_ARGUMENT=0"
@@ -446,7 +449,25 @@ if not "!APP_PORT!"=="!PORT_START!" (
   echo [OK] Puerto !APP_PORT! disponible.
 )
 
-set "APP_URL=http://!APP_HOST!:!APP_PORT!"
+rem 0.0.0.0 se usa solamente para escuchar. El navegador abre 127.0.0.1.
+set "APP_URL=http://!BROWSER_HOST!:!APP_PORT!"
+
+rem ------------------------------------------------------------
+rem 11. Navegador de desarrollo preferido
+rem ------------------------------------------------------------
+if exist "%ProgramFiles%\Firefox Developer Edition\firefox.exe" (
+  set "BROWSER_EXE=%ProgramFiles%\Firefox Developer Edition\firefox.exe"
+  set "BROWSER_NAME=Firefox Developer Edition"
+) else if exist "%ProgramFiles(x86)%\Firefox Developer Edition\firefox.exe" (
+  set "BROWSER_EXE=%ProgramFiles(x86)%\Firefox Developer Edition\firefox.exe"
+  set "BROWSER_NAME=Firefox Developer Edition"
+) else if exist "%LOCALAPPDATA%\Google\Chrome Dev\Application\chrome.exe" (
+  set "BROWSER_EXE=%LOCALAPPDATA%\Google\Chrome Dev\Application\chrome.exe"
+  set "BROWSER_NAME=Google Chrome Dev"
+) else if exist "%LOCALAPPDATA%\Google\Chrome SxS\Application\chrome.exe" (
+  set "BROWSER_EXE=%LOCALAPPDATA%\Google\Chrome SxS\Application\chrome.exe"
+  set "BROWSER_NAME=Google Chrome Canary"
+)
 
 echo.
 echo ============================================
@@ -454,7 +475,9 @@ echo       Entorno validado correctamente
 echo ============================================
 echo Proyecto: !APP_NAME!
 echo Laravel:  !LARAVEL_VERSION!
-echo URL:      !APP_URL!
+echo Escucha:  http://!APP_HOST!:!APP_PORT!
+echo Navegador: !APP_URL!
+if defined BROWSER_NAME echo Browser:  !BROWSER_NAME!
 if "!HAS_FRONTEND!"=="1" echo Frontend: !FRONTEND_COMMAND!
 echo.
 echo Iniciando servicios...
@@ -476,13 +499,19 @@ if errorlevel 1 (
 echo [OK] Laravel iniciado.
 
 if "!OPEN_BROWSER!"=="1" (
-  start "" "!APP_URL!"
+  if defined BROWSER_EXE (
+    start "" "!BROWSER_EXE!" "!APP_URL!"
+  ) else (
+    echo [INFO] No se detecto Firefox Developer Edition ni Chrome Dev/Canary.
+    echo [INFO] Abriendo el navegador predeterminado de Windows.
+    start "" "!APP_URL!"
+  )
 ) else (
   echo [INFO] Navegador no abierto por parametro.
 )
 
 echo.
-echo !APP_NAME! esta disponible en !APP_URL!.
+echo !APP_NAME! esta disponible localmente en !APP_URL!.
 endlocal
 exit /b 0
 
