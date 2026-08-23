@@ -23,6 +23,8 @@ rem
 rem Variables opcionales en .env:
 rem   APP_NAME=Mi Proyecto
 rem   APP_PORT=8030
+rem   DEV_QUEUE_WORKER=true    Abre php artisan queue:work en otra consola.
+rem   DEV_SCHEDULER=true       Abre php artisan schedule:work en otra consola.
 rem
 rem Si existe package.json, el frontend se inicia con Yarn mediante yarn dev,
 rem conservando el comportamiento original del iniciador.
@@ -35,6 +37,8 @@ set "OPEN_BROWSER=1"
 set "CHECK_DATABASE=1"
 set "STRICT_DB_CHECK=0"
 set "HAS_FRONTEND=0"
+set "START_QUEUE_WORKER=0"
+set "START_SCHEDULER=0"
 set "FRONTEND_MANAGER="
 set "FRONTEND_COMMAND="
 set "FRONTEND_INSTALL_COMMAND="
@@ -173,7 +177,7 @@ if not exist .env (
 )
 
 rem ------------------------------------------------------------
-rem 2. Nombre del proyecto y puerto preferido
+rem 2. Nombre del proyecto, puerto y servicios opcionales
 rem ------------------------------------------------------------
 if "%NAME_FROM_ARGUMENT%"=="0" if not defined APP_NAME (
   for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
@@ -198,6 +202,19 @@ if "%PORT_FROM_ARGUMENT%"=="0" if not defined APP_PORT (
 
 if not defined APP_PORT set "APP_PORT=8000"
 set "APP_PORT=!APP_PORT:"=!"
+
+set "DEV_QUEUE_WORKER_VALUE="
+set "DEV_SCHEDULER_VALUE="
+for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+  if /I "%%A"=="DEV_QUEUE_WORKER" set "DEV_QUEUE_WORKER_VALUE=%%B"
+  if /I "%%A"=="DEV_SCHEDULER" set "DEV_SCHEDULER_VALUE=%%B"
+)
+set "DEV_QUEUE_WORKER_VALUE=!DEV_QUEUE_WORKER_VALUE:"=!"
+set "DEV_SCHEDULER_VALUE=!DEV_SCHEDULER_VALUE:"=!"
+if /I "!DEV_QUEUE_WORKER_VALUE!"=="true" set "START_QUEUE_WORKER=1"
+if "!DEV_QUEUE_WORKER_VALUE!"=="1" set "START_QUEUE_WORKER=1"
+if /I "!DEV_SCHEDULER_VALUE!"=="true" set "START_SCHEDULER=1"
+if "!DEV_SCHEDULER_VALUE!"=="1" set "START_SCHEDULER=1"
 
 where powershell >nul 2>nul
 if errorlevel 1 (
@@ -457,6 +474,8 @@ echo Escucha:  http://!APP_HOST!:!APP_PORT!
 echo Navegador: !APP_URL!
 if defined BROWSER_NAME echo Browser:  !BROWSER_NAME!
 if "!HAS_FRONTEND!"=="1" echo Frontend: !FRONTEND_COMMAND!
+if "!START_QUEUE_WORKER!"=="1" echo Worker:   php artisan queue:work
+if "!START_SCHEDULER!"=="1" echo Scheduler: php artisan schedule:work
 echo.
 echo Iniciando servicios...
 
@@ -464,6 +483,14 @@ start "!APP_NAME! Laravel" cmd /k "cd /d ""%CD%"" && php artisan serve --host=!A
 
 if "!HAS_FRONTEND!"=="1" (
   start "!APP_NAME! Frontend" cmd /k "cd /d ""%CD%"" && yarn dev"
+)
+
+if "!START_QUEUE_WORKER!"=="1" (
+  start "!APP_NAME! Queue Worker" cmd /k "cd /d ""%CD%"" && php artisan queue:work"
+)
+
+if "!START_SCHEDULER!"=="1" (
+  start "!APP_NAME! Scheduler" cmd /k "cd /d ""%CD%"" && php artisan schedule:work"
 )
 
 echo [INFO] Esperando que Laravel quede disponible...
