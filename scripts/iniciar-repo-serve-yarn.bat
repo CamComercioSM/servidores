@@ -24,9 +24,8 @@ rem Variables opcionales en .env:
 rem   APP_NAME=Mi Proyecto
 rem   APP_PORT=8030
 rem
-rem El script detecta automaticamente Laravel, Composer y, si package.json tiene
-rem un script "dev", el gestor frontend segun pnpm-lock.yaml, yarn.lock o
-rem package-lock.json. Si no existe lock, utiliza npm.
+rem Si existe package.json, el frontend se inicia con Yarn mediante yarn dev,
+rem conservando el comportamiento original del iniciador.
 rem ============================================================================
 
 set "PROJECT_DIR=%~dp0"
@@ -326,69 +325,48 @@ if not exist bootstrap\cache goto :storage_error
 echo [OK] Directorios de runtime de Laravel.
 
 rem ------------------------------------------------------------
-rem 8. Frontend opcional: npm, Yarn o pnpm
+rem 8. Frontend con Yarn
 rem ------------------------------------------------------------
 if exist package.json (
-  echo [INFO] package.json detectado. Revisando script frontend "dev"...
+  set "HAS_FRONTEND=1"
+  set "FRONTEND_MANAGER=yarn"
+  set "FRONTEND_INSTALL_COMMAND=yarn install"
+  set "FRONTEND_COMMAND=yarn dev"
 
-  set "DEV_SCRIPT=0"
-  for /f "delims=" %%V in ('powershell -NoProfile -Command "$ErrorActionPreference='Stop'; $p=Get-Content 'package.json' -Raw ^| ConvertFrom-Json; if($p.scripts.dev){'1'}else{'0'}" 2^>nul') do set "DEV_SCRIPT=%%V"
-
-  if "!DEV_SCRIPT!"=="1" (
-    set "HAS_FRONTEND=1"
-
-    where node >nul 2>nul
-    if errorlevel 1 (
-      echo [ERROR] El proyecto tiene un script frontend dev, pero Node.js no esta disponible.
-      goto :error
-    )
-
-    for /f "delims=" %%V in ('node --version 2^>nul') do set "NODE_VERSION=%%V"
-    echo [OK] Node.js !NODE_VERSION!.
-
-    if exist pnpm-lock.yaml (
-      set "FRONTEND_MANAGER=pnpm"
-      set "FRONTEND_INSTALL_COMMAND=pnpm install"
-      set "FRONTEND_COMMAND=pnpm dev"
-    ) else if exist yarn.lock (
-      set "FRONTEND_MANAGER=yarn"
-      set "FRONTEND_INSTALL_COMMAND=yarn install"
-      set "FRONTEND_COMMAND=yarn dev"
-    ) else if exist package-lock.json (
-      set "FRONTEND_MANAGER=npm"
-      set "FRONTEND_INSTALL_COMMAND=npm ci"
-      set "FRONTEND_COMMAND=npm run dev"
-    ) else (
-      set "FRONTEND_MANAGER=npm"
-      set "FRONTEND_INSTALL_COMMAND=npm install"
-      set "FRONTEND_COMMAND=npm run dev"
-      echo [ADVERTENCIA] No se encontro lock de frontend. Se utilizara npm install.
-    )
-
-    where !FRONTEND_MANAGER! >nul 2>nul
-    if errorlevel 1 (
-      echo [ERROR] El proyecto requiere !FRONTEND_MANAGER!, pero no esta disponible en el PATH.
-      goto :error
-    )
-
-    if not exist node_modules (
-      echo [INFO] No se encontro node_modules. Ejecutando !FRONTEND_INSTALL_COMMAND!...
-      call !FRONTEND_INSTALL_COMMAND!
-      if errorlevel 1 (
-        echo [ERROR] La instalacion de dependencias frontend fallo.
-        goto :error
-      )
-    )
-
-    if not exist node_modules (
-      echo [ERROR] node_modules no esta disponible despues de instalar dependencias.
-      goto :error
-    )
-
-    echo [OK] Frontend detectado: !FRONTEND_COMMAND!.
-  ) else (
-    echo [INFO] package.json no define scripts.dev. No se levantara un servicio frontend.
+  where node >nul 2>nul
+  if errorlevel 1 (
+    echo [ERROR] El proyecto tiene frontend, pero Node.js no esta disponible.
+    goto :error
   )
+
+  for /f "delims=" %%V in ('node --version 2^>nul') do set "NODE_VERSION=%%V"
+  echo [OK] Node.js !NODE_VERSION!.
+
+  where yarn >nul 2>nul
+  if errorlevel 1 (
+    echo [ERROR] Yarn no esta disponible en el PATH.
+    goto :error
+  )
+
+  for /f "delims=" %%V in ('yarn --version 2^>nul') do set "YARN_VERSION=%%V"
+  echo [OK] Yarn !YARN_VERSION!.
+
+  if not exist node_modules\.bin\vite.cmd (
+    echo [INFO] No se encontro Vite en node_modules.
+    echo [INFO] Ejecutando yarn install...
+    call yarn install
+    if errorlevel 1 (
+      echo [ERROR] yarn install fallo.
+      goto :error
+    )
+  )
+
+  if not exist node_modules\.bin\vite.cmd (
+    echo [ERROR] Vite sigue sin estar disponible despues de Yarn.
+    goto :error
+  )
+
+  echo [OK] Frontend detectado: yarn dev.
 ) else (
   echo [INFO] El proyecto no tiene package.json. Se iniciara solo Laravel.
 )
@@ -485,7 +463,7 @@ echo Iniciando servicios...
 start "!APP_NAME! Laravel" cmd /k "cd /d ""%CD%"" && php artisan serve --host=!APP_HOST! --port=!APP_PORT!"
 
 if "!HAS_FRONTEND!"=="1" (
-  start "!APP_NAME! Frontend" cmd /k "cd /d ""%CD%"" && !FRONTEND_COMMAND!"
+  start "!APP_NAME! Frontend" cmd /k "cd /d ""%CD%"" && yarn dev"
 )
 
 echo [INFO] Esperando que Laravel quede disponible...
