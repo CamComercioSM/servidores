@@ -37,7 +37,7 @@ Verificador de .env para Laravel
 
 Uso:
   verificar-env.bat [RUTA_PROYECTO]
-  verificar-env.bat -Project RUTA -Env .env -Example .env.example
+  verificar-env.bat RUTA -Env .env -Example .env.example
 
 Opciones:
   -OnlyProblems   Oculta variables correctamente ajustadas.
@@ -134,7 +134,7 @@ function Print-Report {
     if ($Empty.Count) { Write-Host "`nVACIAS O NULAS" -ForegroundColor Yellow; $Empty | ForEach-Object { Write-Host "  - $_" } }
     if ($Duplicates.Count) { Write-Host "`nDUPLICADAS" -ForegroundColor Red; foreach ($d in $Duplicates) { Write-Host "  - $($d.Name): lineas $(($d.Group.Line -join ', '))" } }
     if ($Current.Invalid.Count) { Write-Host "`nLINEAS NO INTERPRETADAS" -ForegroundColor Red; $Current.Invalid | ForEach-Object { Write-Host "  - linea $($_.Line): $($_.Raw)" } }
-    if (-not $OnlyProblems -and $Adjusted.Count) { Write-Host "`nVALORES AJUSTADOS" -ForegroundColor Green; $Adjusted | ForEach-Object { Write-Host "  - $_: $(Display-Value $_ $Current.Effective[$_].Value)" } }
+    if (-not $OnlyProblems -and $Adjusted.Count) { Write-Host "`nVALORES AJUSTADOS" -ForegroundColor Green; $Adjusted | ForEach-Object { Write-Host "  - ${_}: $(Display-Value $_ $Current.Effective[$_].Value)" } }
 }
 
 $script:BackupCreated = $false
@@ -193,6 +193,16 @@ function Set-EnvValue([string]$Key, [string]$Value) {
     Save-Lines ([string[]]$out)
 }
 
+function Read-NewValue([string]$Key) {
+    if (Is-Sensitive $Key) {
+        $secure = Read-Host 'Nuevo valor (ENTER=dejar igual, !default=usar valor de la guia)' -AsSecureString
+        $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+        try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
+        finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+    }
+    return Read-Host 'Nuevo valor (ENTER=dejar igual, !default=usar valor de la guia)'
+}
+
 function Review-Values {
     Analyze
     $keys = @($Defaults + $Empty | Sort-Object -Unique)
@@ -204,7 +214,7 @@ function Review-Values {
         Write-Host "`n$key" -ForegroundColor Cyan
         Write-Host "  actual: $(Display-Value $key $currentValue)"
         Write-Host "  guia:   $(Display-Value $key $guideValue)"
-        $answer = Read-Host 'Nuevo valor (ENTER=dejar igual, !default=usar valor de la guia)'
+        $answer = Read-NewValue $key
         if ($answer -eq '') { continue }
         if ($answer -eq '!default') { $answer = $Guide.Effective[$key].RawValue }
         Set-EnvValue $key $answer
@@ -242,9 +252,9 @@ function Interactive-Menu {
 
 Analyze
 Print-Report
-$baseProblems = $Missing.Count + $Extra.Count + $Duplicates.Count + $Current.Invalid.Count
-$strictProblems = $baseProblems + $Defaults.Count + $Empty.Count
 if (-not $NoInteractive -and [Environment]::UserInteractive) { Interactive-Menu; Analyze; Print-Report }
 
+$baseProblems = $Missing.Count + $Extra.Count + $Duplicates.Count + $Current.Invalid.Count
+$strictProblems = $baseProblems + $Defaults.Count + $Empty.Count
 if ($Strict) { if ($strictProblems -gt 0) { exit 1 } } else { if ($baseProblems -gt 0) { exit 1 } }
 exit 0
