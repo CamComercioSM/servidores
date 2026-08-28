@@ -53,9 +53,21 @@ APP_NAME=COPMAR
 APP_PORT=8030
 ```
 
-## Validación de variables de entorno Laravel
+## Validación y corrección de variables de entorno Laravel
 
-- [`laravel/verificador-env/`](laravel/verificador-env/): compara `.env` con `.env.example` y reporta variables faltantes, sobrantes, valores por defecto, valores ajustados, vacíos, duplicados y líneas inválidas sin mostrar secretos por defecto.
+- [`laravel/verificador-env/`](laravel/verificador-env/): compara `.env` con `.env.example`, reporta diferencias y ofrece correcciones interactivas con copia de seguridad automática.
+
+La implementación es autónoma: Windows usa PowerShell embebido dentro del propio `.bat` y Linux/macOS usa shell/`awk`. Ya no existe dependencia de `verificar-env.php`.
+
+El menú permite:
+
+- agregar variables faltantes desde `.env.example`;
+- quitar variables sobrantes;
+- resolver duplicadas conservando la última definición efectiva;
+- revisar uno por uno valores vacíos o que siguen con el valor por defecto;
+- volver a verificar después de cada corrección.
+
+Antes de la primera modificación crea `.env.bak-YYYYMMDD-HHMMSS`.
 
 Uso rápido en Windows:
 
@@ -63,10 +75,16 @@ Uso rápido en Windows:
 scripts\laravel\verificador-env\verificar-env.bat "C:\ruta\proyecto-laravel"
 ```
 
-Uso estricto para validación previa a despliegue:
+Uso estricto sin correcciones interactivas:
 
 ```bat
-scripts\laravel\verificador-env\verificar-env.bat "C:\ruta\proyecto-laravel" --strict
+scripts\laravel\verificador-env\verificar-env.bat "C:\ruta\proyecto-laravel" -Strict -NoInteractive
+```
+
+Linux/macOS:
+
+```bash
+scripts/laravel/verificador-env/verificar-env.sh /ruta/proyecto-laravel
 ```
 
 Consulte la [documentación del verificador](laravel/verificador-env/README.md).
