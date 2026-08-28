@@ -4,6 +4,7 @@ Organice cada script según su función principal:
 
 - `backup/`: respaldo, restauración, retención y verificación.
 - `database/`: mantenimiento y operación de bases de datos.
+- `laravel/`: herramientas reutilizables para desarrollo, validación y despliegue de proyectos Laravel.
 - `linux/`: usuarios, servicios, paquetes, almacenamiento y sistema operativo.
 - `monitoring/`: disponibilidad, recursos, certificados y alertas.
 - `network/`: DNS, firewall, puertos, conectividad y proxy.
@@ -51,6 +52,24 @@ También puede definirse un puerto estable por proyecto en `.env`:
 APP_NAME=COPMAR
 APP_PORT=8030
 ```
+
+## Validación de variables de entorno Laravel
+
+- [`laravel/verificador-env/`](laravel/verificador-env/): compara `.env` con `.env.example` y reporta variables faltantes, sobrantes, valores por defecto, valores ajustados, vacíos, duplicados y líneas inválidas sin mostrar secretos por defecto.
+
+Uso rápido en Windows:
+
+```bat
+scripts\laravel\verificador-env\verificar-env.bat "C:\ruta\proyecto-laravel"
+```
+
+Uso estricto para validación previa a despliegue:
+
+```bat
+scripts\laravel\verificador-env\verificar-env.bat "C:\ruta\proyecto-laravel" --strict
+```
+
+Consulte la [documentación del verificador](laravel/verificador-env/README.md).
 
 ## Scripts de bases de datos
 
